@@ -1,0 +1,399 @@
+﻿@using CMS.DL.Model;
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Cases;
+@using CaseManagementSystem.Data.Companies;
+@using CaseManagementSystem.Data.TitlePrefixes;
+@using CaseManagementSystem.Data.Enum;
+@using CaseManagementSystem.Data.Subjects;
+@using CaseManagementSystem.Data.Documents;
+@using CaseManagementSystem.Data.Users;
+@using System.ComponentModel.DataAnnotations;
+@using System.Text;
+@using System.Text.RegularExpressions;
+
+@inject UsersService UsersService
+@inject SubjectService SubjectService
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject CaseService CaseService
+@inject CaseWatchersService CaseWatchersService
+
+<MudDivider />
+
+<MudForm @ref="_form">
+    <MudDialog>
+        <DialogContent>
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="@Color.Info" Style="position:absolute;top:0;right:0" />
+            }
+            <MudPaper Elevation="0">
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">Details</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudDivider />
+                            <MudCardContent>
+                                <MudItem xs="12" Class="d-flex align-center justify-space-between">
+                                    <MudText>Case Number: </MudText>
+                                    <MudText>@_subjectsView.CaseNumber</MudText>
+                                </MudItem>
+                                <MudItem xs="12" Class="d-flex align-center justify-space-between">
+                                    <MudText>Date Created: </MudText>
+                                    <MudText>@_subjectsView.CaseCreated</MudText>
+                                </MudItem>
+                                <MudItem xs="12" Class="d-flex align-center justify-space-between">
+                                    <MudText>Details: </MudText>
+                                    <MudText>@_subjectsView.CaseNotes</MudText>
+                                </MudItem>
+                                <MudItem xs="12" Class="d-flex align-center justify-space-between">
+                                    <MudText>Firstname: </MudText>
+                                    <MudText>@_subjectsView.FirstName</MudText>
+                                </MudItem>
+                                <MudItem xs="12" Class="d-flex align-center justify-space-between">
+                                    <MudText>Lastname: </MudText>
+                                    <MudText>@_subjectsView.LastName</MudText>
+                                </MudItem>
+                                <MudItem xs="12" Class="d-flex align-center justify-space-between">
+                                    <MudText>Email: </MudText>
+                                    <MudText>@_subjectsView.Email</MudText>
+                                </MudItem>
+                                <MudItem xs="12" Class="d-flex align-center justify-space-between">
+                                    <MudText>DOB: </MudText>
+                                    <MudText>@_subjectsView.DateOfBirth?.ToString("dd/MM/yyyy")</MudText>
+                                </MudItem>
+                                <MudItem xs="12" Class="d-flex align-center justify-space-between">
+                                    <MudText>Tel No: </MudText>
+                                    <MudText>@_subjectsView.TelephoneNumber</MudText>
+                                </MudItem>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">Address</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudDivider />
+                            <MudCardContent>
+                                <MudItem xs="12" Class="d-flex align-center justify-space-between">
+                                    <MudText>Address1: </MudText>
+                                    <MudText>@_subjectsView.Addresses</MudText>
+                                </MudItem>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Filled" OnClick="Cancel">Cancel</MudButton>
+
+            @if (((CaseStatusType)(_subjectsView.CaseStatus ?? 1) == CaseStatusType.NEW || (CaseStatusType)(_subjectsView.CaseStatus ?? 1) == CaseStatusType.OPEN) || _subjectsView.CaseStatus == (byte?)CaseStatusType.CHECKEDOUT)
+            {
+                <MudTooltip Text="Checkout or Uncheckout Case" Color="Color.Primary" Placement="Placement.Top">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveCase">
+                        @checkoutButtonText
+                    </MudButton>
+                </MudTooltip>
+
+                <MudTooltip Text="Add report" Color="Color.Primary" Placement="Placement.Top">
+                    <MudButton Variant="Variant.Filled" OnClick="@((e) => RetakeQuestionsAndAddFile(_subjectsView.CaseId))" Class="">Add trace details and Report</MudButton>
+                </MudTooltip>
+            }
+
+        @*     @if (_subjectsView.CaseStatus != (byte?)CaseStatusType.REVIEW && _caseViewModel.EndClient == _currentLoginUser.Id && _caseViewModel.TraceLevelName == "TR1")
+            {
+                <MudTooltip Text="Add trace details" Color="Color.Primary" Placement="Placement.Top">
+                    <MudButton Variant="Variant.Filled" OnClick="@((e) => RetakeQuestions(_subjectsView.CaseId))" Class="">Add trace details</MudButton>
+                </MudTooltip>
+            } *@
+
+  @*           @if (_subjectsView.CaseStatus == (byte?)CaseStatusType.CHECKEDOUT && _subjectsView.CaseStatus == (byte?)CaseStatusType.OPEN)
+            {
+                 <MudTooltip Text="Checkout or Uncheckout Case" Color="Color.Primary" Placement="Placement.Top">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => CheckoutCase(_subjectsView.CaseId))">
+            @checkoutButtonText
+            </MudButton>
+            </MudTooltip>
+            } *@
+
+            @if (_subjectsView.CaseStatus != (byte?)CaseStatusType.CLOSED && _caseViewModel.EndClient == _currentLoginUser.Id && _caseViewModel.TraceLevelName == "SL1" && _caseViewModel.TraceLevelName == "TR1")
+            {
+                <MudTooltip Text="Add report" Color="Color.Primary" Placement="Placement.Top">
+                    <MudButton Variant="Variant.Filled" OnClick="@((e) => RetakeQuestionsAndAddFile(_subjectsView.CaseId))" Class="">Add trace details and Report</MudButton>
+                </MudTooltip>
+            }
+        
+            @if (
+            ((CaseStatusType)(_subjectsView.CaseStatus ?? 1) == CaseStatusType.NEW
+            || (CaseStatusType)(_subjectsView.CaseStatus ?? 1) == CaseStatusType.OPEN
+            || (CaseStatusType)(_subjectsView.CaseStatus ?? 1) == CaseStatusType.REVIEW)
+            && (_caseViewModel.EndClient ?? Guid.Empty) != _currentLoginUser.Id
+            && _caseWatcher == null)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="WatchCase"> Watch </MudButton>
+            }
+            @if (
+            ((CaseStatusType)(_subjectsView.CaseStatus ?? 1) == CaseStatusType.NEW
+            || (CaseStatusType)(_subjectsView.CaseStatus ?? 1) == CaseStatusType.OPEN
+            || (CaseStatusType)(_subjectsView.CaseStatus ?? 1) == CaseStatusType.REVIEW)
+            && (_caseViewModel.EndClient ?? Guid.Empty) != _currentLoginUser.Id
+            && _caseWatcher != null)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RemoveWatchCase"> Remove Watch </MudButton>
+            }
+        </DialogActions>
+    </MudDialog>
+</MudForm>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+    [Parameter] public Guid? CaseId { get; set; }
+
+    private SubjectViewModel _subjectsView = new SubjectViewModel();
+    private MudForm _form;
+    private bool _loading = true;
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+    CaseViewModel _caseViewModel = new CaseViewModel();
+    CaseWatchers _caseWatcher = null;
+    private List<SubjectCaseTraceQuestions> _subjectTraceQuestions = null;
+    private List<CaseTraceQuestions> _caseTraceQuestions = new List<CaseTraceQuestions>();
+    private bool _isCheckedOut => _caseViewModel?.Status == (byte)CaseStatusType.CHECKEDOUT;
+    private string checkoutButtonText => _isCheckedOut ? "Check IN" : "Checkout";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+
+        if (Id != null && Id != Guid.Empty)
+        {
+            await GetSubjectsById();
+            _caseViewModel = await CaseService.GetCasesByIdAsync((Guid)Id);
+            _caseWatcher = await CaseWatchersService.GetCaseWatcherAsync((Guid)Id, _currentLoginUser.Id);
+        }
+
+        _loading = false;
+    }
+
+    private async Task OpenManageSubjectsDialog()
+    {
+        var parameters = new DialogParameters<ManageSubjects>();
+        parameters.Add(x => x.Id, _subjectsView.Id);
+        parameters.Add(x => x.CaseStatus, (CaseStatusType)_subjectsView.CaseStatus);
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        DialogResult result = await Dialog.Show<ManageSubjects>("Subjects", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            MudDialog.Close();
+        }
+    }
+    private async Task CheckoutCase(Guid? Id)
+    {
+        try
+        {
+            CaseViewModel caseViewModel = await CaseService.GetCasesByIdAsync((Guid)Id);
+            caseViewModel.Updated = DateTime.UtcNow;
+            caseViewModel.UpdatedBy = _currentLoginUser.Id;
+            caseViewModel.Status = _isCheckedOut ? (byte)CaseStatusType.NEW : (byte)CaseStatusType.CHECKEDOUT;
+            caseViewModel.EndClient = _isCheckedOut ? (Guid?)null : _currentLoginUser.Id;
+
+            await CaseService.UpdateCasesAsync(caseViewModel);
+            Snackbar.Add("Successfully updated case status.", Severity.Success);
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Error updating case status. Please try again.", Severity.Error);
+        }
+        MudDialog.Close();
+    }
+
+    private async Task<bool> RetakeQuestions(Guid? ID)
+    {
+        // if it's an agent, then it's a submit to review of the case. Retrieve the case and update its Status to REVIEW
+        var parameters = new DialogParameters<ManageSubjectAgentSubmit>();
+        parameters.Add(x => x.CaseId,ID.Value );
+        parameters.Add("PreviousTraceQuestions", _subjectTraceQuestions);
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageSubjectAgentSubmit>("Subject trace questions", parameters, options).Result;
+        if (result.Cancelled)
+            return false;
+        else
+        {
+            _caseTraceQuestions = (List<CaseTraceQuestions>)result.Data;
+            _subjectTraceQuestions = new List<SubjectCaseTraceQuestions>();
+            foreach (CaseTraceQuestions ctq in _caseTraceQuestions)
+            {
+                _subjectTraceQuestions.Add(new SubjectCaseTraceQuestions()
+                    {
+                        Created = (DateTime)ctq.Created,
+                        Answer = ctq.Answer,
+                        Question = ctq.Question,
+                        CreatedBy = _currentLoginUser.GetFullName()
+                    });
+            }
+            MudDialog.Close();
+            return true;
+        }
+
+
+    }
+
+    private async Task OpenFilePopup()
+    {
+        var parameters = new DialogParameters<UploadFile>();
+        parameters.Add(x => x.Email, _caseViewModel.ClientEmail);
+        parameters.Add(y => y.Id, Id);
+        parameters.Add(y => y.SubjectId, _caseViewModel.SubjectId);
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<UploadFile>("Upload File", parameters, options).Result;
+
+        if (!result.Canceled && result.Data != null)
+        {
+            await OnInitializedAsync();
+        }
+
+        await OnInitializedAsync();
+    }
+
+    private async Task<bool> RetakeQuestionsAndAddFile(Guid? ID)
+    {
+        await RetakeQuestions(ID);
+       // await OpenFilePopup();
+        return true;
+    }
+
+    private async Task WatchCase()
+    {
+        try
+        {
+            CaseWatchers caseWatcher = new CaseWatchers()
+                {
+                    CaseId = (Guid)Id,
+                    UserId = _currentLoginUser.Id,
+                    Created = DateTime.UtcNow
+                };
+            await CaseWatchersService.InsertCasesAsync(caseWatcher);
+            MudDialog.Close(DialogResult.Ok(Id));
+            Snackbar.Add("Added as watcher for the case.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Error! Please try again.", Severity.Error);
+        }
+    }
+
+    private async Task RemoveWatchCase()
+    {
+        try
+        {
+            await CaseWatchersService.DeleteCasesAsync((Guid)Id, _currentLoginUser.Id);
+            MudDialog.Close(DialogResult.Ok(Id));
+            Snackbar.Add("Removed as watcher for the case.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Error! Please try again.", Severity.Error);
+        }
+    }
+    private async Task GetSubjectsById()
+    {
+        _subjectsView = await SubjectService.GetSubjectsWithCaseByCaseIdAsync((Guid)Id);
+    }
+
+    private async Task SaveCase()
+    {
+        await _form.Validate();
+
+        if (_form.IsValid)
+        {
+            try
+            {
+                var parameters = new DialogParameters<ConfirmationDialogContent>();
+                parameters.Add(x => x.ContentText, $"Have you traced this SUBJECT? ");
+                parameters.Add(x => x.ButtonText, "Yes");
+                parameters.Add(x => x.CancelButtonText, "No");
+                parameters.Add(x => x.Color, Color.Error);
+                var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+                DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+                if (result.Canceled == false)
+                {
+                    // Assign to user and checkout so no one takes it while the agent is filling the details
+                    CaseViewModel caseViewModel = await CaseService.GetCasesByIdAsync((Guid)Id);
+                    if (caseViewModel != null)
+                    {
+                        await RetakeQuestions(_caseViewModel.Id);
+                        // var parametersSubject = new DialogParameters<ManageSubjects>();
+                        // parametersSubject.Add(x => x.Id, caseViewModel.SubjectId);
+                        // parametersSubject.Add(x => x.CaseId, caseViewModel.Id);
+                        // options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+                        // result = await Dialog.Show<ManageSubjects>("Subjects", parametersSubject, options).Result;
+                    }
+                    MudDialog.Close(DialogResult.Ok(Id));
+                }
+                else
+                {
+                    CaseViewModel _caseViewModel = await CaseService.GetCasesByIdAsync((Guid)Id);
+                    parameters = new DialogParameters<ConfirmationDialogContent>();
+                    parameters.Add(x => x.ContentText, $"Do you want to check out this SUBECT RECORD for up to 2 hours ? ");
+                    parameters.Add(x => x.ButtonText, "Yes");
+                    parameters.Add(x => x.CancelButtonText, "No");
+                    parameters.Add(x => x.Color, Color.Error);
+
+                    options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+                    result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+                   
+                    if (result.Canceled == false)
+                    { 
+                        // Checkout subject
+                        await RetakeQuestions(_caseViewModel.Id);
+                        // CaseViewModel caseViewModel = await CaseService.GetCasesByIdAsync((Guid)Id);
+                        // if (caseViewModel != null)
+                        // {
+                        //     caseViewModel.Updated = DateTime.UtcNow;
+                        //     caseViewModel.UpdatedBy = _currentLoginUser.Id;
+                        //    // caseViewModel.Status = (byte?)CaseStatusType.CHECKEDOUT;
+                        //     caseViewModel.Status = _isCheckedOut ? (byte)CaseStatusType.NEW : (byte)CaseStatusType.CHECKEDOUT;
+                        //     caseViewModel.EndClient = _currentLoginUser.Id;
+                        //     await CaseService.UpdateCasesAsync(caseViewModel);
+                        // }
+                    }
+                    else if (result.Canceled == true)
+                    { 
+                        CaseViewModel caseViewModel = await CaseService.GetCasesByIdAsync((Guid)Id);
+                        if (caseViewModel != null)
+                        {
+                            caseViewModel.Updated = DateTime.UtcNow;
+                            caseViewModel.UpdatedBy = _currentLoginUser.Id;
+                            //caseViewModel.Status = (byte?)CaseStatusType.CHECKEDOUT;
+                            caseViewModel.Status = _isCheckedOut ? (byte)CaseStatusType.NEW : (byte)CaseStatusType.CHECKEDOUT;
+                            caseViewModel.EndClient = _currentLoginUser.Id;
+
+                            await CaseService.UpdateCasesAsync(caseViewModel);
+                        }
+                    }
+                    MudDialog.Close(DialogResult.Ok(Id));
+                }
+            }
+            catch (Exception)
+            {
+                Snackbar.Add("Error! Please try again.", Severity.Error);
+            }
+        }
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

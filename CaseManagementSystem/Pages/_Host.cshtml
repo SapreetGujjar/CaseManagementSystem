@@ -1,0 +1,288 @@
+﻿@page "/"
+
+@using Microsoft.AspNetCore.Components.Web
+
+@namespace CaseManagementSystem.Pages
+
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <base href="~/" />
+
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="https://use.fontawesome.com/releases/v5.14.0/css/all.css" rel="stylesheet">
+
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+
+    <link href="CaseManagementSystem.styles.css" rel="stylesheet" />
+
+    <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+
+    <style type="text/css">
+
+        :root {
+            --mud-zindex-drawer: 850 !important;
+            --mud-zindex-popover: 900 !important;
+            --mud-zindex-appbar: 950 !important;
+            --mud-zindex-dialog: 1000 !important;
+        }
+
+    </style>
+
+    <link rel="icon" type="image/png" href="favicon.png" />
+
+    <script type="text/javascript">
+        function getInputValue(inputId) {
+            debugger;
+            console.log(inputId)
+            let el = document.getElementById(inputId);
+            return el?.value ?? "";
+
+        }
+        function getInputValueAddress(inputId) {
+          //  console.log(inputId[0].val())
+            console.log("^^^^^^^^^^^^^^")
+            console.log($(`#${inputId[0]}`).val());
+            console.log('hdskhfdsjlsd')
+            let Address1 = $(`#${inputId[0]}`).val() != " " ? ($(`#${inputId[0]}`).val()) : $(`#${inputId[0]}`).val();
+            let Address2 = $(`#${inputId[1]}`).val() != " " ? ($(`#${inputId[1]}`).val()) : $(`#${inputId[1]}`).val();
+            // let Address3 = $(`#${inputId[2]}`).val() != " " ? ($(`#${inputId[2]}`).val() + ",") : $(`#${inputId[2]}`).val();
+            let Address3 = $(`#${inputId[2]}`).val() != " " ? ($(`#${inputId[2]}`).val()) : $(`#${inputId[2]}`).val();
+            //let BuildingNo = $(`#${inputId[2]}`).val() != " " ? ($(`#${inputId[2]}`).val()) : $(`#${inputId[2]}`).val();
+            let Town = $(`#${inputId[3]}`).val() != " " ? ($(`#${inputId[3]}`).val()) : $(`#${inputId[3]}`).val();
+            // let District = $(`#${inputId[5]}`).val() != " " ? ($(`#${inputId[5]}`).val() + ",") : $(`#${inputId[5]}`).val();
+           // let Country = $(`#${inputId[4]}`).val();
+            let PostCode = $(`#${inputId[4]}`).val();
+
+            //let AllAddress = [Address1, Address2, Address3, BuildingNo, Town, Country, PostCode].filter(Boolean).join(', ');
+            let AllAddress = [Address1, Address2, Address3, Town, PostCode].filter(Boolean).join(', ');
+            console.log("full address", AllAddress)
+            return AllAddress ?? "";
+
+        }
+
+        function getInputValueEmpty(){
+            $("#Address1").val(" ");
+            $("#Address2").val(" ");
+            $("#Address3").val(" ");
+            //$("#BuildingNo").val(" ");
+            $("#Town").val(" ");
+           // $("#Country").val(" ");
+            $("#PostCode").val(" ");
+        }
+
+        function addFocus(inputId) {
+            let el = document.getElementById(inputId);
+
+            el?.focus();
+
+            setTimeout(function () {
+                var e = new Event('OnClick', {
+                    bubbles: true,
+                    cancelable: true,
+                    composed: true,
+                    selectionStart: el.value.length,
+                    selectionEnd: el.value.length
+                    
+                });
+                
+                e.which = 65;
+                e.code = 'keyG';
+                e.key = 'g';
+                el?.dispatchEvent(e);
+                var pasteEvent = new ClipboardEvent('paste', {
+                    bubbles: true,
+                    cancelable: true,
+                    composed: true
+                });
+                el?.dispatchEvent(pasteEvent);
+
+                
+            }, 100)
+
+            
+
+
+            el.selectionStart = el.value.length;
+
+            el.selectionEnd = el.value.length;
+
+
+
+        }
+        // $(document).on("click",".getAddress_autocomplete_suggestion",function() {
+        //     $("#addressInput").val($(this).text())
+
+        // });
+        function Country() {
+            // var test = getAddress.autocomplete('addressInput', 'phQiuTiB8UmDxHChlVxl-Q42028', { minimum_characters: 5, delay: 200 });
+            getAddress.autocomplete('addressInput', 'j4DD-Sgv1Uis3NtYnXW_CQ15746');
+
+
+            //$('#addressInput').focus();
+
+            // getAddress.autocomplete('addressInput', 'phQiuTiB8UmDxHChlVxl-Q42028');
+        }
+
+        
+
+        // Function to remove all address elements except 'addressInput'
+        const removeAllElementsExceptAddressInput = () => {
+            const elements = [
+                "Address1",
+                "Address2",
+                "Address3",
+                //"BuildingNo",
+                "Town",
+                //"Country",
+                "PostCode"
+            ];
+
+            elements.forEach(elementId => {
+                const element = $(`#${elementId}`);
+                if (element.length) {
+                    element.closest('.mud-grid-item').remove();
+                }
+            });
+        };
+
+        // Function to add all elements with values based on address data
+        const addAllElementsWithValue = (e) => {
+            const elements = [
+                { id: "PostCode", value: e.address.postcode, placeholder: "Post Code" },
+               // { id: "Country", value: e.address.country, placeholder: "Country" },
+                { id: "Town", value: e.address.town_or_city, placeholder: "Town or City" },
+                //{ id: "BuildingNo", value: e.address.building_number, placeholder: "Building Number" },
+                { id: "Address3", value: e.address.locality, placeholder: "Address line 3" },
+                { id: "Address2", value: `${e.address.line_2 ? e.address.line_2 + ' ' : ''}${e.address.line_3 ? e.address.line_3 + ' ' : ''}${e.address.line_4 ? e.address.line_4 : ''}`.trim(), placeholder: "Address line 2" },
+                { id: "Address1", value: e.address.line_1, placeholder: "Address line 1" }
+            ];
+
+        const insertAfterSelector = '.mud-grid-item.mud-grid-item-xs-2:not(.text-right)';
+            
+
+            elements.forEach(element => {
+                if (element.value !== undefined && element.value !== null && element.value !== "") {
+                    const parentId = element.id === "addressInput" ? "addressInput" : element.id.replace(/[0-9]/g, '');
+                    const html = `
+                        <div class="mud-grid-item mud-grid-item-xs-6">
+                            <div class="mud-input-control mud-input-input-control">
+                                <div class="mud-input-control-input-container">
+                                    <div class="mud-input mud-input-outlined mud-shrink">
+                                        <input class="mud-input-slot mud-input-root mud-input-root-outlined" id="${element.id}" type="text" placeholder="${element.placeholder}" inputmode="text" maxlength="524288" aria-invalid="false" value="${element.value}">
+                                        <div class="mud-input-slot mud-input-root mud-input-root-outlined" style="display:none" tabindex="-1"></div>
+                                        <div class="mud-input-outlined-border"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    // Insert the html after the specified selector
+                    $(insertAfterSelector).after(html);
+                }
+            });
+        };
+
+
+        document.addEventListener("getaddress-autocomplete-address-selected", function (e) {
+            const formattedAddress = e.address.formatted_address.join(', ').trim().replace(/,\s*,/g, ',');
+            $("#addressInput").val(formattedAddress.replace(/,\s*,/g, ','));
+
+            // Remove all address elements except 'addressInput'
+            removeAllElementsExceptAddressInput();
+            removeAllElementsExceptAddressInput(); //again to cleanup if missed by first function
+
+            // Add all elements with values based on address data
+            addAllElementsWithValue(e);
+
+            getAddress.destroy();
+        });
+
+        //SESSION TIME OUT 
+
+
+        let countdownTimer;
+
+        function startCountdown() {
+            countdownTimer = setTimeout(logout, 300000); 
+        }
+
+        function resetCountdown() {
+            clearTimeout(countdownTimer);
+            startCountdown();
+        }
+
+        function logout() {
+            document.getElementById("HiddenBtnLogOut").click();
+        }
+
+        startCountdown();
+
+        window.addEventListener('mousemove', resetCountdown);
+        window.addEventListener('keydown', resetCountdown);
+        window.addEventListener('scroll', resetCountdown);
+      
+        window.downloadFile = (filePath, fileName) => {
+            const anchor = document.createElement('a');
+            anchor.href = window.URL.createObjectURL(new Blob([filePath], { type: 'text/csv' }));
+            anchor.download = fileName;
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+        };
+        window.openInNewTab = function (url) {
+            window.open(url, '_blank');
+        }
+
+         
+        function downloadPdfFile(fileUrl) {
+            var link = document.createElement('a');
+            link.href = fileUrl;
+            link.download = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+   
+
+
+
+
+    </script>
+
+    <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
+
+    <script src="https://cdn.getaddress.io/scripts/getaddress-autocomplete-1.1.3.min.js">
+    </script>
+</head>
+<body>
+    <component type="typeof(App)" render-mode="ServerPrerendered" />
+
+    <div id="blazor-error-ui">
+        <environment include="Staging,Production">
+            An error has occurred. This application may no longer respond until reloaded.
+        </environment>
+        <environment include="Development">
+
+            An unhandled exception has occurred. See browser dev tools for details.
+
+        </environment>
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+    <script src="_framework/blazor.server.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+
+
+</body>
+
+</html>

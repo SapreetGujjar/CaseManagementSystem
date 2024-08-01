@@ -1,0 +1,1014 @@
+﻿@page "/index"
+
+@using CaseManagementSystem.Data.Auth;
+@using CMS.DL.Model;
+@using CaseManagementSystem.Data.Dashboard;
+@using CaseManagementSystem.Data.Users;
+@using CaseManagementSystem.Data.Cases;
+@using CaseManagementSystem.Data.Enum;
+@using MudBlazor;
+@using System.Net;
+@using System.Data;
+@using System.Text;
+@using CaseManagementSystem.Data.Companies;
+@using CaseManagementSystem.Data.Subjects;
+
+
+
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject DashboardService DashboardService;
+@inject UsersService UsersService;
+@inject IDialogService Dialog;
+@inject ISnackbar Snackbar;
+@inject SubjectService SubjectService;
+@inject CaseService CaseService;
+@inject CompaniesService CompaniesService
+@inject IJSRuntime JS;
+
+<style>
+    .cards {
+        background-color: aliceblue;
+        margin: 17px;
+        border-radius: 13px;
+    }
+
+    .number {
+        padding: 40px 20px;
+        border-radius: 10px;
+    }
+
+    .box-1 {
+        background: #774a8f;
+        color: #fff;
+    }
+
+        .box-1:hover {
+            background: #b872dd;
+            color: #fff;
+        }
+
+    .box-2 {
+        background: #142758;
+        color: #ffff;
+    }
+
+    .box-3 {
+        background: #516189;
+        color: #ffff;
+    }
+
+    .mud-container-maxwidth-xl {
+        max-width: 1280px;
+    }
+
+
+    .cases-card-sm {
+        height: 40% !important;
+        background-color: #F9F9F9;
+    }
+
+    .cases-card-lg {
+        height: 40% !important;
+        background-color: #F9F9F9;
+    }
+
+    .box-shadow-none {
+        box-shadow: none;
+    }
+
+    .icon-container {
+        border-radius: 999px;
+        width: fit-content;
+        height: fit-content;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 12px;
+    }
+
+
+    .review-status {
+        color: #17C653 !important;
+        font-size: .875rem;
+    }
+
+    .closed-status {
+        color: #7239EA !important;
+        font-size: .875rem;
+    }
+
+    .new-status {
+        color: #1B84FF !important;
+        font-size: .875rem;
+    }
+
+    .text-nowrap {
+        white-space: nowrap
+    }
+
+    .text-wrap-pretty {
+        text-wrap: pretty;
+        min-width: 280px;
+    }
+
+    .box-shadow-custom {
+        box-shadow: rgba(0, 0, 0, 0.06) 0px 1px 4px !important;
+    }
+
+    .mud-table-toolbar {
+        justify-content: space-between;
+    }
+
+    .theadBG {
+        background-color: #e8edf1 !important;
+    }
+
+    .tableData-padding {
+        padding: 4px 16px;
+    }
+
+    .Agent-tableData-padding {
+        padding: 4px 8px;
+    }
+
+
+    .text-nowrap {
+        white-space: nowrap
+    }
+
+    .text-wrap-pretty {
+        text-wrap: pretty;
+        width: 140px;
+    }
+
+    .mud-table-cell {
+        padding: 15px;
+    }
+</style>
+
+<PageTitle>Dashboard</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-3"><b>Dashboard</b></MudText>
+<MudGrid>
+    <MudItem xs="4">
+        <MudCard Class="box-shadow-custom">
+            <MudCardContent Class="pb-8 pt-12">
+                <MudGrid Spacing="3" Class="gap-3">
+                    <MudGrid AlignItems="AlignItems.Center" style="margin-bottom: 10px;margin-right: 15px; margin-left: 15px; background-color: #f9f9f9; border-radius: 8px;padding: 12px 8px;">
+                        <MudItem xs="3" class="w-100 d-flex" Style="justify-content: center; align-items:center">
+                            <MudItem Class="h-100 w-100 d-flex justify-content-center align-items-center">
+                                <div class="icon-container" style="background: #17c6530d;">
+                                    <MudImage Style="height:36px" Src="..\dashboard-icons\Review-Cases.png" Alt="..." Elevation="25" Class="box-shadow-none" />
+                                </div>
+                            </MudItem>
+                        </MudItem>
+                        <MudItem xs="9">
+                            <MudText Typo="Typo.h6" style="color:#17C653; cursor: pointer;" @onclick="() => GetCountCasesListPage(7)">Review Cases</MudText>
+                            <MudItem>
+                                @foreach (var CaseCount in _dashboard)
+                                {
+                                    if (@CaseCount.Statustype == 7)
+                                    {
+                                        <MudText Typo="Typo.h6" style="color:#252F4A"> <strong>@CaseCount.StatusCount</strong></MudText>
+                                    }
+                                }
+                            </MudItem>
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudGrid AlignItems="AlignItems.Center" style="margin-bottom: 10px;margin-right: 15px; margin-left: 15px; background-color: #f9f9f9; border-radius: 8px;padding: 12px 8px;">
+                        <MudItem xs="3" class="w-100 d-flex" Style="justify-content: center; align-items:center">
+                            <MudItem Class="h-100 w-100 d-flex justify-content-center align-items-center">
+                                <div class="icon-container" style="background: #17c6530d;">
+                                    <MudImage Style="height:36px" Src="..\dashboard-icons\Review-Cases.png" Alt="..." Elevation="25" Class="box-shadow-none" />
+                                </div>
+                            </MudItem>
+                        </MudItem>
+                        <MudItem xs="9">
+                            <MudText Typo="Typo.h6" style="color:#c93636;cursor: pointer;" @onclick="() => GetCountCasesListPage(1)">Open Cases</MudText>
+                            <MudItem>
+                                @foreach (var CaseCount in _dashboard)
+                                {
+                                    if (@CaseCount.Statustype == 1)
+                                    {
+                                        <MudText Typo="Typo.h6" style="color:#252F4A"><strong>@CaseCount.StatusCount</strong></MudText>
+                                    }
+                                }
+                            </MudItem>
+                        </MudItem>
+
+                    </MudGrid>
+                    <MudGrid AlignItems="AlignItems.Center" style="margin-top: auto; margin-bottom: 10px;margin-right: 15px; margin-left: 15px; background-color: #f9f9f9; border-radius: 8px;padding: 12px 8px;">
+                        <MudItem xs="3" class="w-100 d-flex" Style="justify-content: center; align-items:center">
+                            <MudItem Class="h-100 w-100 d-flex justify-content-center align-items-center">
+                                <div class="icon-container" style="background: #1b84ff1c;">
+                                    <MudImage Style="height:36px" Src="..\dashboard-icons\New-Cases.png" Alt="..." Elevation="25" Class="box-shadow-none" />
+                                </div>
+                            </MudItem>
+                        </MudItem>
+                        <MudItem xs="9">
+                            <MudText Typo="Typo.h6" style="color:#1B84FF;cursor: pointer;" @onclick="() => GetCountCasesListPage(5)">New Cases</MudText>
+                            <MudItem>
+                                @foreach (var CaseCount in _dashboard)
+                                {
+                                    if (@CaseCount.Statustype == 5)
+                                    {
+                                        <MudText Typo="Typo.h6" style="color:#252F4A"><strong>@CaseCount.StatusCount</strong></MudText>
+                                    }
+                                }
+                            </MudItem>
+                        </MudItem>
+                    </MudGrid>
+                    <MudGrid AlignItems="AlignItems.Center" style="margin-top: auto; margin-bottom: 10px;margin-right: 15px; margin-left: 15px; background-color:#f9f9f9; border-radius: 8px; padding: 12px 8px;">
+                        <MudItem xs="3" class="w-100 d-flex" Style="justify-content: center; align-items:center">
+                            <MudItem Class="h-100 w-100 d-flex justify-content-center align-items-center">
+                                <div class="icon-container" style="background: #7239ea1f;">
+                                    <MudImage Style="height:36px" Src="..\dashboard-icons\Closed-Cases.png" Alt="..." Elevation="25" Class="box-shadow-none" />
+                                </div>
+                            </MudItem>
+                        </MudItem>
+                        <MudItem xs="9">
+                            <MudText Typo="Typo.h6" style="color:#7239EA; cursor:pointer;" @onclick="() => GetCountCasesListPage(2)">Closed Cases</MudText>
+                            <MudItem>
+                                @foreach (var CaseCount in _dashboard)
+                                {
+                                    if (@CaseCount.Statustype == 2)
+                                    {
+                                        <MudText Typo="Typo.h6" style="color:#252F4A"><strong>@CaseCount.StatusCount</strong></MudText>
+                                    }
+                                }
+                            </MudItem>
+                        </MudItem>
+                    </MudGrid>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="8">
+
+        <MudPaper Class="overflow-auto box-shadow-custom">
+            @if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+            {
+                <MudTable Items="@_subjects" Hover="true" Style="padding: 0 4px;box-shadow:none;" FixedHeader="@fixed_header" FixedFooter="@fixed_footer" Height="@(fixed_header || fixed_footer ?"316px":"")">
+                    <ToolBarContent>
+                        <MudText Typo="Typo.h6">Cases</MudText>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Agent")
+                        {
+                            @if (CustomAuthenticationStateProvider.RoleType() != "Client")
+                            {
+                                <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" OnClick="@((e) => OpenManageCaseDialog(null,false))">Create</MudButton>
+                            }
+                        }
+                    </ToolBarContent>
+                    <HeaderContent>
+                        <MudTd Class="theadBG"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<SubjectViewModel, object>(x=>x.CaseNumber)" Class="text-nowrap">Case #</MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.FirstName)" Class="text-nowrap">Firstname</MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.LastName)" Class="text-nowrap">Lastname</MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.Email)" Class="text-nowrap">Email</MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.TelephoneNumber)" Class="text-nowrap">Telephone Number</MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.Addresses)" Class="text-nowrap">Addresses</MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.CaseStatus)" Class="text-nowrap">Status</MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG" Style="text-align:center">View Job</MudTd>
+                        <MudTd class="theadBG">View Subject</MudTd>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd Class="thead Agent-tableData-padding" DataLabel="CaseNumber">
+                            @context.CaseNumber
+                            @* <MudLink @onclick="@(() => OpenManageCaseDialog(@context.CaseId,true))">@context.CaseNumber</MudLink> *@
+                        </MudTd>
+                        <MudTd Class="thead Agent-tableData-padding" DataLabel="Firstname">@context.FirstName</MudTd>
+                        <MudTd Class="thead Agent-tableData-padding" DataLabel="Lastname">@context.LastName</MudTd>
+                        <MudTd Class="thead Agent-tableData-padding" DataLabel="Email">@context.Email</MudTd>
+                        <MudTd Class="thead Agent-tableData-padding" DataLabel="Telephone Number">@context.TelephoneNumber</MudTd>
+                        <MudTd Class="thead Agent-tableData-padding" DataLabel="Address1"><span Class="text-nowrap text-wrap-pretty">@context.Addresses</span></MudTd>
+
+                        @if (context.CaseStatus == 2)
+                        {
+                            <MudTd Class="py-2 closed-status" DataLabel="Status"> @(((CaseStatusType)(context.CaseStatus ?? 1)).ToString())</MudTd>
+                        }
+                        @if (context.CaseStatus == 5)
+                        {
+                            <MudTd Class="py-2 new-status" DataLabel="Status"> @(((CaseStatusType)(context.CaseStatus ?? 1)).ToString())</MudTd>
+                        }
+                        @if (context.CaseStatus == 7)
+                        {
+                            <MudTd Class="py-2 review-status" DataLabel="Status"> @(((CaseStatusType)(context.CaseStatus ?? 1)).ToString()) </MudTd>
+                        }
+                        @if (context.CaseStatus == 1 || context.CaseStatus == 3 || context.CaseStatus == 4 || context.CaseStatus == 6)
+                        {
+                            <MudTd Class="py-2" DataLabel="Status"> @(((CaseStatusType)(context.CaseStatus ?? 1)).ToString())</MudTd>
+                        }
+
+                        <MudTd DataLabel="View Job">
+                            <MudTooltip Text="View Job" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="fas fa-eye" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageAgentCaseDialog(@context.CaseId))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+
+                        <MudTd DataLabel="View Subject" style="padding: 0; margin: 0;">
+                            @if (context.Id != null)
+                            {
+                                <MudTooltip Text="View Subject" Color="Color.Primary" Placement="Placement.Top">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Person" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageSubjectDialog(context.Id, @context.CaseId, (CaseStatusType)(@context.CaseStatus ?? 1)))"></MudIconButton>
+                                </MudTooltip>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[]{5,25,100}" />
+                    </PagerContent>
+                </MudTable>
+            }
+            else if (CustomAuthenticationStateProvider.RoleType() == "Client")
+            {
+                <MudTable Items="@_cases" Hover="true" Style="padding: 0 4px;box-shadow:none;" FixedHeader="@fixed_header" FixedFooter="@fixed_footer" Height="@(fixed_header || fixed_footer ?"316px":"")">
+                    <ToolBarContent>
+                        <MudText Typo="Typo.h6">Cases</MudText>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Agent")
+                        {
+                            @if (CustomAuthenticationStateProvider.RoleType() != "Client" && CustomAuthenticationStateProvider.RoleType() != "Internal")
+                            {
+                                <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" OnClick="@((e) => OpenManageCaseDialog(null,false))">Create</MudButton>
+                            }
+                        }
+                    </ToolBarContent>
+                    <HeaderContent>
+                        <MudTd><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<CaseViewModel, object>(x=>x.CaseNumber)"><span class="company-list-th">Case ID </span></MudTableSortLabel></MudTd>
+                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.TraceLevelName)"><span class="company-list-th">Trace Level</span></MudTableSortLabel></MudTd>
+                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.SubjectName)"><span class="company-list-th">Subject</span></MudTableSortLabel></MudTd>
+                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Status)"><span class="company-list-th">Status</span></MudTableSortLabel></MudTd>
+                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Fee)"><span class="company-list-th">Fee </span></MudTableSortLabel></MudTd>
+                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.ClientReference)"><span class="company-list-th">Client Reference</span></MudTableSortLabel></MudTd>
+                        <MudTd>Notes</MudTd>
+                        <MudTd></MudTd>
+                        <MudTd></MudTd>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Case Number">@context.CaseNumber</MudTd>
+                        <MudTd DataLabel="Trace Level">@context.TraceLevelName</MudTd>
+                        <MudTd DataLabel="Subject">@context.SubjectName</MudTd>
+                        <MudTd DataLabel="Status">
+                            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin" && (CaseStatusType)@context.Status == CaseStatusType.REVIEW)
+                            {
+
+                                <MudLink @onclick="@(() => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))">@context.GetStatusName()</MudLink>
+                            }
+                            else
+                            {
+                                @context.GetStatusName()
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Fee">@context.Fee</MudTd>
+                        <MudTd DataLabel="ClientRef">@context.ClientName</MudTd>
+                        <MudTd>@context.Notes</MudTd>
+                        @if (!string.IsNullOrEmpty(context.FilePath))
+                        {
+                            <MudTd DataLabel="Download" style="padding: 0; margin: 0;">
+
+                                <MudTooltip Text="Download Case Report" Color="Color.Primary" Placement="Placement.Top">
+                                    <MudIconButton Icon="@Icons.Material.Filled.FileDownload" Color="Color.Primary" aria-label="Download" OnClick="@((e) => DownloadCaseReportFile(@context.Id, @context.SubjectId))"></MudIconButton>
+                                </MudTooltip>
+                            </MudTd>
+                        }
+                        else
+                        {
+                            <MudTd DataLabel="Download" style="padding: 0; margin: 0;">
+
+
+                            </MudTd>
+                        }
+                        <MudTd>
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[]{5,25,100}" />
+                    </PagerContent>
+                </MudTable>
+            }
+            else
+            {
+                <MudTable Items="@_cases" Hover="true" Style="padding: 0 4px;box-shadow:none;" FixedHeader="@fixed_header" FixedFooter="@fixed_footer" Height="@(fixed_header || fixed_footer ?"316px":"")">
+                    <ToolBarContent>
+                        <MudText Typo="Typo.h6">Cases</MudText>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Agent")
+                        {
+                            @if (CustomAuthenticationStateProvider.RoleType() != "Client" || CustomAuthenticationStateProvider.RoleType() == "Internal" || CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+                            {
+                                <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" OnClick="@((e) => OpenManageCaseDialog(null,false))">Create</MudButton>
+                            }
+                        }
+                    </ToolBarContent>
+                    <HeaderContent>
+                        <MudTd Class="theadBG"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<CaseViewModel, object>(x=>x.CaseNumber)" Class="text-nowrap">Case ID </MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Created)" Class="text-nowrap">Date Added </MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.TraceLevelName)" Class="text-nowrap">Trace Level</MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.SubjectName)">Subject</MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Status)">Status</MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Fee)">Fee </MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.CompanyName)">Company</MudTableSortLabel></MudTd>
+                        <MudTd Class="theadBG"><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.CreatedByName)" Class="text-nowrap">Created By</MudTableSortLabel></MudTd>
+                        @*
+                    @if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+                    {
+                    *@                            <MudTd Class="theadBG"> View Job</MudTd>
+                        @* } *@
+                        <MudTd Class="theadBG"></MudTd>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Internal")
+                        {
+                            <MudTd Class="theadBG" Style="text-align:center"><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.CreatedByName)">Action</MudTableSortLabel></MudTd>
+                        }
+                        @*      <MudTd></MudTd>
+                    <MudTd></MudTd>
+                    <MudTd></MudTd> *@
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd Class="thead tableData-padding" DataLabel="Case Number">
+                            @if (CustomAuthenticationStateProvider.RoleType() != "Agent" && CustomAuthenticationStateProvider.RoleType() != "Internal")
+                            {
+                                <MudLink @onclick="@(() => OpenManageCaseDialog(@context.Id,true))">@context.CaseNumber</MudLink>
+                            }
+                            else
+                            {
+                                <MudTb>@context.CaseNumber</MudTb>
+                            }
+
+                        </MudTd>
+                        <MudTd Class="thead text-nowrap tableData-padding" DataLabel="Date Added">@context.Created?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                        <MudTd Class="thead tableData-padding" DataLabel="Trace Level">@context.TraceLevelName</MudTd>
+                        <MudTd Class="thead tableData-padding" DataLabel="Subject">@context.SubjectName</MudTd>
+                        <MudTd Class="thead tableData-padding" DataLabel="Status">
+                            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin" && (CaseStatusType)@context.Status == CaseStatusType.REVIEW)
+                            {
+                                <MudLink class="new-status" @onclick="@(() => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))">@context.GetStatusName()</MudLink>
+                            }
+                            else
+                            {
+                                <span class="@(context.Status == 1 ? "review-status" : "closed-status")">@context.GetStatusName()</span>
+                            }
+                        </MudTd>
+                        <MudTd Class="thead tableData-padding" DataLabel="Fee">@context.Fee</MudTd>
+                        <MudTd Class="thead tableData-padding" DataLabel="Company">@context.CompanyName</MudTd>
+                        <MudTd Class="thead tableData-padding" DataLabel="Created By">@context.CreatedByName</MudTd>
+                        <MudTd DataLabel="View Job">
+                            <MudTooltip Text="View Job" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="fas fa-eye" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageAgentCaseDialog(@context.Id))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+
+                        @*                         @if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+                    {
+                    <MudTd Class="thead tableData-padding" DataLabel="View Job" style="padding-right: 0px; padding-left: 0px;">
+                    <MudTooltip Text="View Job" Color="Color.Primary" Placement="Placement.Top">
+                    <MudIconButton Icon="fas fa-eye" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageAgentCaseDialog(@context.Id))"></MudIconButton>
+                    </MudTooltip>
+                    </MudTd>
+                    }
+                    *@
+                        @if (!string.IsNullOrEmpty(context.FilePath))
+                        {
+                            <MudTd Class="thead tableData-padding" DataLabel="Download" style="padding: 0; margin: 0;">
+
+                                <MudTooltip Text="Download Case Report" Color="Color.Primary" Placement="Placement.Top">
+                                    <MudIconButton Icon="@Icons.Material.Filled.FileDownload" Color="Color.Primary" aria-label="Download" OnClick="@((e) => DownloadCaseReportFile(@context.Id, @context.SubjectId))"></MudIconButton>
+                                </MudTooltip>
+                            </MudTd>
+                        }
+                        else
+                        {
+                            <MudTd DataLabel="Download" style="padding: 0; margin: 0;">
+
+
+                            </MudTd>
+                        }
+
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Client" && CustomAuthenticationStateProvider.RoleType() != "Internal")
+                        {
+                            <MudTd Class="thead tableData-padding" DataLabel="Edit">
+                                <div class="d-flex">
+                                    <MudTooltip Text="Edit Case" Color="Color.Primary" Placement="Placement.Top">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCaseDialog(@context.Id,false))"></MudIconButton>
+                                    </MudTooltip>
+                                    <MudTooltip Text="Remove Case" Color="Color.Primary" Placement="Placement.Top">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveCase(@context.Id))"></MudIconButton>
+                                    </MudTooltip>
+                                    @if (CustomAuthenticationStateProvider.RoleType() != "Internal")
+                                    {
+                                        @if (context.SubjectId != null)
+                                        {
+                                            <MudTooltip Text="View Subject" Color="Color.Primary" Placement="Placement.Top">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Person" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))"></MudIconButton>
+                                            </MudTooltip>
+                                        }
+                                    }
+                                </div>
+                            </MudTd>
+                        }
+                        else if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+                        {
+                            <MudTd Class="thead tableData-padding" DataLabel="Edit">
+                                <div class="d-flex">
+                                    @if (context.SubjectId != null)
+                                    {
+                                        <MudTooltip Text="View Subject" Color="Color.Primary" Placement="Placement.Top">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Person" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))"></MudIconButton>
+                                        </MudTooltip>
+                                    }
+                                </div>
+                            </MudTd>
+                        }
+                        else
+                        {
+                            <MudTd Class="thead tableData-padding">
+                            </MudTd>
+                            <MudTd Class="thead">
+
+                            </MudTd>
+                            <MudTd Class="thead">
+                            </MudTd>
+                        }
+
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[]{5,25,100}" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin" || CustomAuthenticationStateProvider.RoleType() == "Internal")
+{
+    <MudGrid style="margin-bottom: 16px;margin-top:24px">
+        <MudItem xs="6">
+            <MudPaper Class="card-height overflow-auto box-shadow-custom ">
+                <MudTable Items="@_companies" Hover="true" FixedHeader="@fixed_header" FixedFooter="@fixed_footer" Height="@(fixed_header || fixed_footer ?"356px":"")" Striped='true'>
+                    <ToolBarContent>
+                        <MudText Typo="Typo.h6">Company</MudText>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Client" && CustomAuthenticationStateProvider.RoleType() != "Internal")
+                        {
+                            <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" OnClick="@((e) => OpenManageCompaniesDialog(null))">Create</MudButton>
+                        }
+                    </ToolBarContent>
+                    <HeaderContent>
+                        <MudTh class="theadBG"><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<CompaniesViewModel, object>(x=>x.CompanyName)"><span class="text-nowrap company-list-th">Name</span></MudTableSortLabel></MudTh>
+                        <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.KeyContact)"><span class="company-list-th text-nowrap">Contact</span></MudTableSortLabel></MudTh>
+                        <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.KeyContactRole)"><span class="company-list-th text-nowrap">Contact Position</span></MudTableSortLabel></MudTh>
+                        <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.Address)"><span>Address</span></MudTableSortLabel></MudTh>
+                        <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.AddressType)"><span class="company-list-th text-nowrap">AddressType</span></MudTableSortLabel></MudTh>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Internal")
+                        {
+                            <MudTh class="theadBG" Style="text-align:center"><span>Action</span></MudTh>
+                        }
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Name" Class="tableData-padding text-nowrap">
+                            <MudLink @onclick="@(() => OpenManageCompanyDialog(@context.Id,true))">@context.CompanyName</MudLink>
+
+                        </MudTd>
+                        <MudTd Style="width: 120px" DataLabel="Contact" Class="tableData-padding">@context.KeyContact</MudTd>
+                        <MudTd DataLabel="Contact Position" Class="tableData-padding">@context.KeyContactRole</MudTd>
+                        <MudTd DataLabel="Address" Class="text-nowrap text-wrap-pretty tableData-padding" Style="line-height:2">@context.Address</MudTd>
+                        <MudTd DataLabel="Address" Class="tableData-padding">@context.AddressType</MudTd>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Internal")
+                        {
+                            <MudTd Class="tableData-padding">
+                                <div class="d-flex">
+                                    <MudTooltip Text="Edit Company" Color="Color.Primary" Placement="Placement.Top">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCompanyDialog(@context.Id,false))"></MudIconButton>
+                                    </MudTooltip>
+
+                                    <MudTooltip Text="Remove Company" Color="Color.Primary" Placement="Placement.Top">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveCompany(@context.Id))"></MudIconButton>
+                                    </MudTooltip>
+                                </div>
+                            </MudTd>
+                        }
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[]{5,25,100}" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6">
+            <MudPaper Class="card-height overflow-auto box-shadow-custom">
+                <MudTable Items="@_users" Hover="true" FixedHeader="@fixed_header" FixedFooter="@fixed_footer" Height="@(fixed_header || fixed_footer ?"356px":"")" Striped='true'>
+                    <ToolBarContent>
+                        <MudText Typo="Typo.h6">Users</MudText>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Client")
+                        {
+                            <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" OnClick="@((e) => OpenManageUserDialog(null))">Create</MudButton>
+                        }
+                    </ToolBarContent>
+                    <HeaderContent>
+
+                        <MudTh class="theadBG">
+                            <MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.FirstName)">Firstname</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh class="theadBG">
+                            <MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.LastName)">Lastname</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh class="theadBG">
+                            <MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.RoleType)">Role</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh class="theadBG">
+                            <MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.EmailAddress)">User Email</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh class="theadBG">
+                            <MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.CompanyName)">Company</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh class="theadBG">
+                            <MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.LastLogin)">Last Login</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh class="theadBG">
+                            <MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.IsActive)" Class="text-nowrap">Is Active</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh class="theadBG" Style="text-align:center">Action</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Firstname" Class="tableData-padding">
+                            <MudLink @onclick="@(() => OpenManageUserDialog(@context.Id,null,true))">@context.FirstName</MudLink>
+
+                        </MudTd>
+                        <MudTd DataLabel="Lastname" Class="tableData-padding">@context.LastName</MudTd>
+                        <MudTd DataLabel="Role" Class="tableData-padding">@context.GetRoleTypeName()</MudTd>
+                        <MudTd DataLabel="User Email" Class="tableData-padding">@context.EmailAddress</MudTd>
+                        <MudTd DataLabel="Company" Class="text-nowrap tableData-padding">
+                            @if ((CaseManagementSystem.Data.Enum.RoleType)(context.RoleType ?? 0) == CaseManagementSystem.Data.Enum.RoleType.Agent)
+                                @context.AgentCompanyName
+                            else
+                                @context.CompanyName
+
+
+                        </MudTd>
+                        <MudTd DataLabel="Last Login" Class="tableData-padding text-nowrap">@context.LastLogin?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                        <MudTd DataLabel="Is Active" Class="tableData-padding">
+                            <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                        </MudTd>
+                        <MudTd Class="tableData-padding">
+                            <div class="d-flex">
+                                <MudTooltip Text="Edit User" Color="Color.Primary" Placement="Placement.Top">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" Disabled="@IsEditDisabled(@context)" OnClick="@((e) => OpenManageUserDialog(@context.Id, null,false))"></MudIconButton>
+                                </MudTooltip>
+
+                                <MudTooltip Text="Change Password" Color="Color.Primary" Placement="Placement.Top">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Password" Color="Color.Primary" aria-label="Password" Disabled="@IsPasswordDisabled(@context)" OnClick="@(() => OpenChangePasswordDialog(@context.Id))"></MudIconButton>
+                                </MudTooltip>
+                            </div>
+                        </MudTd>
+
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[]{5,25,100}" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    private Dashboard _SelectedDashboardItems = null;
+    IEnumerable<DashboardViewModel> _dashboard = new List<DashboardViewModel>();
+    private IEnumerable<CaseViewModel> _cases = new List<CaseViewModel>();
+    private IEnumerable<UsersViewModel> _users = new List<UsersViewModel>();
+    private IEnumerable<CompaniesViewModel> _companies = new List<CompaniesViewModel>();
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+    private IEnumerable<DashboardViewModel> DashBoarddata;
+    private IEnumerable<SubjectViewModel> _subjects = new List<SubjectViewModel>();
+
+
+    bool fixed_header = true;
+    bool fixed_footer = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+        _dashboard = await GetDashBoardDataList(_currentLoginUser.Id);
+        await GetUsers();
+        await GetCases();
+        await GetCompanies();
+
+    }
+
+    private bool IsEditDisabled(UsersViewModel context)
+    {
+        if (_currentLoginUser.RoleType != 1)
+        {
+            return context.RoleType == 1;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    private bool IsPasswordDisabled(UsersViewModel context)
+    {
+        if (_currentLoginUser.RoleType == 4)
+        {
+            if (context.Id == _currentLoginUser.Id)
+            {
+                return false;
+            }
+        }
+        if (_currentLoginUser.RoleType == 1)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    private async void GetCountCasesListPage(int Status)
+    {
+        if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+            NavigationManager.NavigateTo("/agentcase?Status=" + Status);
+        else
+            NavigationManager.NavigateTo("/cases?Status=" + Status);
+    }
+
+    private async Task<IEnumerable<DashboardViewModel>> GetDashBoardDataList(Guid _currentLoginUser)
+    {
+        if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+        {
+            DashBoarddata = await DashboardService.GetDashBoardDataListAdmin();
+            return DashBoarddata;
+        }
+        else if (CustomAuthenticationStateProvider.RoleType() == "Client")
+        {
+
+            DashBoarddata = await DashboardService.GetDashBoardDataListClient(_currentLoginUser);
+            return DashBoarddata;
+
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+        {
+            DashBoarddata = await DashboardService.GetDashBoardDataListAdmin();
+            return DashBoarddata;
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+        {
+            DashBoarddata = await DashboardService.GetDashBoardDataAgent(_currentLoginUser);
+            return DashBoarddata;
+        }
+        return DashBoarddata;
+    }
+    private async Task OpenManageAgentCaseDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<ManageAgentCase>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageAgentCase>("Case Update", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetSubjects();
+        }
+        OnInitializedAsync();
+        // MudDialog.Close();
+    }
+
+    private async Task GetSubjects()
+    {
+        _subjects = await SubjectService.GetAllSubjectsWithCaseByAgentAsync(_currentLoginUser.Id);
+    }
+
+    #region UserList
+    private async Task GetUsers()
+    {
+        if (CustomAuthenticationStateProvider.RoleType() != "InternalAdmin")
+        {
+            _users = await UsersService.GetAllUsersByClientAsync(_currentLoginUser.Id);
+        }
+        else
+        {
+            _users = await UsersService.GetAllUsersAsync();
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+        {
+            _users = await UsersService.GetAllUsersAsync();
+        }
+    }
+    private async Task OpenManageUserDialog(Guid? Id, byte? RoleType, bool isEditable)
+    {
+        var parameters = new DialogParameters<ManageUser>();
+        parameters.Add(x => x.Id, Id);
+        parameters.Add(x => x.RoleTypeValue, RoleType);
+        parameters.Add(x => x.View, isEditable);
+
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageUser>("User", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetUsers();
+        }
+    }
+    private async Task OpenChangePasswordDialog(Guid Id)
+    {
+        var parameters = new DialogParameters<ManageUser>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ChangePassword>("Change Password", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetUsers();
+        }
+    }
+    private async Task ActiveUser(UsersViewModel record, bool isChecked)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to {(isChecked ? "active" : "in-active")} this record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await UsersService.ActiveUsersAsync(record.Id, isChecked, _currentLoginUser.Id);
+            await GetUsers();
+
+            Snackbar.Add($"Successfully {(isChecked ? "active" : "in-active")} user.", Severity.Success);
+        }
+    }
+    #endregion
+
+    #region CasesList
+
+    private async Task OpenManageCaseDialog(Guid? Id, bool isEditable)
+    {
+        var parameters = new DialogParameters<ManageCase>();
+        parameters.Add(x => x.Id, Id);
+        parameters.Add(x => x.View, isEditable);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageCase>("Case", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetCases();
+        }
+    }
+
+
+    private async Task OpenManageCompaniesDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<ManageCompany>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageCompany>("Company", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetCompanies();
+        }
+    }
+
+    private async Task OpenManageUserDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<ManageUser>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageUser>("User", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetUsers();
+        }
+    }
+    private async Task GetCases()
+    {
+        if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+        {
+            _cases = await CaseService.GetAllCasesAsync();
+        }
+        else if (CustomAuthenticationStateProvider.RoleType() == "Client")
+        {
+            // To be reviewed
+            //_cases = await CaseService.GetAllCasesAsync();
+            _cases = await CaseService.GetCasesByClientAsync(_currentLoginUser.Id);
+            // _cases = await CaseService.GetCasesByAgentAsync(_currentLoginUser.Id);
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+        {
+            _cases = await CaseService.GetAllCasesAsync();
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+        {
+            _subjects = await SubjectService.GetAllSubjectsWithCaseByAgentAsync(_currentLoginUser.Id);
+        }
+    }
+    private async Task RemoveCase(Guid id)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this case record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await CaseService.DeleteCasesAsync(id);
+            await GetCases();
+
+            Snackbar.Add($"Successfully removed case.", Severity.Success);
+        }
+    }
+    private async Task OpenManageSubjectDialog(Guid? subjectId, Guid? caseId, CaseStatusType caseStatus)
+    {
+        var parameters = new DialogParameters<ManageSubjects>();
+        parameters.Add(x => x.Id, subjectId);
+        parameters.Add(x => x.CaseId, caseId);
+        parameters.Add(x => x.CaseStatus, caseStatus);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageSubjects>("Subjects", parameters, options).Result;
+
+        if (CustomAuthenticationStateProvider.RoleType() != "Agent")
+        {
+            if (!result.Canceled)
+            {
+                await GetCases();
+            }
+        }
+    }
+
+    #endregion
+
+
+    #region CompanyList
+
+    private async Task OpenManageCompanyDialog(Guid? Id, bool isEditable)
+    {
+        var parameters = new DialogParameters<ManageCompany>();
+        parameters.Add(x => x.Id, Id);
+        parameters.Add(x => x.View, isEditable);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageCompany>("Company", parameters, options).Result;
+
+
+        if (!result.Canceled)
+        {
+            await GetCompanies();
+        }
+    }
+    private async Task GetCompanies()
+    {
+        _companies = await CompaniesService.GetAllCompaniesAsync();
+    }
+    private async Task RemoveCompany(Guid id)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this company record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await CompaniesService.DeleteCompaniesAsync(id);
+
+            await GetCompanies();
+
+            Snackbar.Add($"Successfully removed company.", Severity.Success);
+        }
+    }
+    public async Task<CaseViewModel> DownloadCaseReportFile(Guid? CaseId, Guid? SubjectId)
+    {
+        var CaseReportFile = await CaseService.GetCaseReportFile(CaseId, SubjectId);
+        var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "UploadedDocument");
+        var filePath = Path.Combine(uploadsFolder, CaseReportFile.FilePath);
+        var fileUrl = $"/UploadedDocument/{CaseReportFile.FilePath}";
+        await JS.InvokeVoidAsync("downloadPdfFile", fileUrl);
+
+        return null;
+    }
+    #endregion
+}
+

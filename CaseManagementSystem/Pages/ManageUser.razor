@@ -1,0 +1,637 @@
+﻿@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Companies;
+@using CaseManagementSystem.Data.CompaniesAddress
+@using CaseManagementSystem.Data.Enum;
+@using CaseManagementSystem.Data.Users;
+@using System.ComponentModel.DataAnnotations;
+@using System.Text;
+@using System.Text.RegularExpressions;
+@using CaseManagementSystem.Emails.Templates
+@using CaseManagementSystem.Emails
+
+@inject UsersService UsersService
+@inject CompaniesService CompaniesService
+@inject CountryService CountryService
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject IJSRuntime JS;
+@inject IConfiguration configuration;
+@inject IEmailService EMailService;
+
+<MudDivider />
+@if (View == true)
+{
+    <MudForm @ref="_form" ReadOnly>
+        <MudDialog>
+            <DialogContent>
+                @if (_loading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="@Color.Info" Style="position:absolute;top:0;right:0" />
+                }
+                <MudPaper Elevation="0">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="6">
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12" hidden>
+                                    <MudTextField T="string" @bind-Value="_usersView.Password" Label="Password" Variant="Variant.Outlined" Disabled="true"></MudTextField>
+                                </MudItem>
+
+                                <MudItem xs="6">
+                                    <MudTextField T="string" @bind-Value="_usersView.FirstName" Label="First Name" Variant="Variant.Outlined" Required="true" RequiredError="First name is required!"></MudTextField>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudTextField T="string" @bind-Value="_usersView.LastName" Label="Last Name" Variant="Variant.Outlined" Required="true" RequiredError="Last name is required!"></MudTextField>
+                                </MudItem>
+
+                                <MudItem xs="6">
+                                    <MudSelect T="bool" @bind-Value="_usersView.IsActive" Label="Is Active" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                                        <MudSelectItem Value="true">Yes</MudSelectItem>
+                                        <MudSelectItem Value="false">No</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudSelect T="byte?" @bind-Value="_usersView.RoleType" Label="Role" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Required="true" RequiredError="Role type is required!">
+                                        @foreach (RoleType item in Enum.GetValues(typeof(RoleType)))
+                                        {
+                                            if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+                                            {
+                                                <MudSelectItem Value="(byte?)item">@item.ToString()</MudSelectItem>
+                                            }
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+
+
+                                @*         @if ((RoleType)(_usersView.RoleType ?? 0) == RoleType.Agent)
+                            {
+                            <MudItem xs="12">
+                            <MudRadioGroup @bind-SelectedOption="_usersView.AgentType">
+                            <MudRadio T="short?" Option="1">Individual</MudRadio>
+                            <MudRadio T="short?" Option="2">Company</MudRadio>
+                            </MudRadioGroup>
+                            </MudItem>
+                            @if (_usersView.AgentType == 2)
+                            {
+                            <MudItem xs="12">
+                            <MudTextField T="string" @bind-Value="_usersView.AgentCompanyName" Label="Company Name" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+                            <MudItem xs="12">
+                            <MudTextField T="string" @bind-Value="_usersView.AgentCompanyAddress" Label="Company Address" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+                            <MudItem xs="6">
+                            <MudButton Variant="Variant.Filled" Disabled Color="Color.Default" OnClick="@((e) => OpenManageCompanyDialog(null))" Class="ml-3">CREATE NEW COMPANY</MudButton>
+                            </MudItem>
+
+
+                            }
+                            }
+                            else
+                            {
+                            <MudItem xs="12" Class="d-flex align-center">
+                            <MudAutocomplete T="CompaniesViewModel" Label="Company" SearchFunc="@SearchCompanies" Value="_selectedCompany" ToStringFunc="@(e=> e==null?null : $"{e.CompanyName}")" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" ValueChanged="OnValueChanged">
+                            </MudAutocomplete>
+                            <MudButton Variant="Variant.Filled" Disabled Color="Color.Default" OnClick="@((e) => OpenManageCompanyDialog(null))" Class="ml-3">CREATE NEW COMPANY</MudButton>
+                            </MudItem>
+                            } *@
+
+                                @if ((RoleType)(_usersView.RoleType ?? 0) == RoleType.Agent)
+                                {
+                                    <MudItem xs="12">
+                                        <MudRadioGroup @bind-SelectedOption="selectedAgentType">
+                                            <MudRadio T="bool" Option="false">Individual</MudRadio>
+                                            <MudRadio T="bool" Option="true">Company</MudRadio>
+                                        </MudRadioGroup>
+                                    </MudItem>
+                                    @if (selectedAgentType == true)
+                                    {
+                                        <MudItem xs="12" Class="d-flex align-center">
+                                            <MudAutocomplete T="CompaniesViewModel" Label="Company" SearchFunc="@SearchCompanies" Value="_selectedCompany" ToStringFunc="@(e=> e==null?null : $"{e.CompanyName}")" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" ValueChanged="OnValueChanged">
+                                            </MudAutocomplete>
+                                            <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@((e) => OpenManageCompanyDialog(null))" Class="ml-3">CREATE NEW COMPANY</MudButton>
+                                        </MudItem>
+                                    }
+
+                                }
+                                @if ((RoleType)(_usersView.RoleType ?? 2) == RoleType.Client)
+                                {
+                                    <MudItem xs="12" Class="d-flex align-center">
+                                        <MudAutocomplete T="CompaniesViewModel" Label="Company" SearchFunc="@SearchCompanies" Value="_selectedCompany" ToStringFunc="@(e=> e==null?null : $"{e.CompanyName}")" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" ValueChanged="OnValueChanged">
+                                        </MudAutocomplete>
+                                        <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@((e) => OpenManageCompanyDialog(null))" Class="ml-3">CREATE NEW COMPANY</MudButton>
+                                    </MudItem>
+                                }
+                                <MudItem xs="12">
+                                    <MudTextField T="string" @bind-Value="_usersView.EmailAddress" Label="Email Address" Variant="Variant.Outlined" Required="true" RequiredError="Email is required!" Validation="EmailCheck"></MudTextField>
+                                </MudItem>
+
+                                @*    <MudItem xs="6">
+                            <MudDatePicker Label="Last Login" @bind-Date="_usersView.LastLogin" ReadOnly="true" />
+                            <MudDatePicker Style="margin-top: 20px;" Label="Last Login" @bind-Date="_usersView.LastLogin" ReadOnly="true" />
+
+                            </MudItem> *@
+
+                            </MudGrid>
+                        </MudItem>
+
+                        <MudItem xs="6">
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12">
+                                    <MudGrid>
+                                        <MudItem xs="12">
+                                            <MudSelect T="string" Value="_usersView.AddressType" ValueChanged="ChangeAddress" Label="AddressType" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                                                @foreach (var addressType in _addressTypes)
+                                                {
+                                                    if (addressType != "User Address")
+                                                    {
+                                                        <MudSelectItem Value="@addressType">@addressType</MudSelectItem>
+                                                    }
+                                                }
+                                            </MudSelect>
+                                        </MudItem>
+                                        <MudItem xs="10">
+                                            <MudGooglePlacesAutocomplete T="string" @ref="_googleAddress" @bind-Value="_usersView.Address"
+                                                                         Adornment="Adornment.Start"
+                                                                         AdornmentIcon="@Icons.Material.Filled.Map"
+                                                                         ApiKey="@_googleMapsApiKey" />
+                                        </MudItem>
+                                        <MudItem xs="2" class="text-right">
+                                            <MudIconButton Disabled Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@((e) => OpenManageCompaniesDialog(null))" />
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudItem>
+                            </MudGrid>
+                        </MudItem>
+
+
+
+                        @* <MudItem xs="3">
+                    <MudSelect T="string" Label="Key Contact" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                    </MudSelect>
+                    </MudItem> *@
+
+                    </MudGrid>
+                </MudPaper>
+            </DialogContent>
+            <DialogActions>
+                <MudButton Disabled Variant="Variant.Filled" OnClick="Cancel">Cancel</MudButton>
+                <MudButton Disabled Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveUser">Save</MudButton>
+            </DialogActions>
+        </MudDialog>
+    </MudForm>
+}
+else
+{
+    <MudForm @ref="_form">
+        <MudDialog>
+            <DialogContent>
+                @if (_loading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="@Color.Info" Style="position:absolute;top:0;right:0" />
+                }
+                <MudPaper Elevation="0">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="6">
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12" hidden>
+                                    <MudTextField T="string" @bind-Value="_usersView.Password" Label="Password" Variant="Variant.Outlined" Disabled="true"></MudTextField>
+                                </MudItem>
+
+                                <MudItem xs="6">
+                                    <MudTextField T="string" @bind-Value="_usersView.FirstName" Label="First Name" Variant="Variant.Outlined" Required="true" RequiredError="First name is required!"></MudTextField>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudTextField T="string" @bind-Value="_usersView.LastName" Label="Last Name" Variant="Variant.Outlined" Required="true" RequiredError="Last name is required!"></MudTextField>
+                                </MudItem>
+
+                                <MudItem xs="6">
+                                    <MudSelect T="bool" @bind-Value="_usersView.IsActive" Label="Is Active" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                                        <MudSelectItem Value="true">Yes</MudSelectItem>
+                                        <MudSelectItem Value="false">No</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudSelect T="byte?" @bind-Value="_usersView.RoleType" Label="Role" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Required="true" RequiredError="Role type is required!">
+                                        @foreach (RoleType item in Enum.GetValues(typeof(RoleType)))
+                                        {
+                                            if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin" || item != RoleType.InternalAdmin && item != RoleType.Client)
+                                            {
+                                                <MudSelectItem Value="(byte?)item">@item.ToString()</MudSelectItem>
+                                            }
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                @if ((RoleType)(_usersView.RoleType ?? 0) == RoleType.Agent)
+                                {
+                                    <MudItem xs="12">
+                                        <MudRadioGroup @bind-SelectedOption="selectedAgentType">
+                                            <MudRadio T="bool" Option="false">Individual</MudRadio>
+                                            <MudRadio T="bool" Option="true">Company</MudRadio>
+                                        </MudRadioGroup>
+                                    </MudItem>
+                                    @if (selectedAgentType == true)
+                                    {
+                                        <MudItem xs="12" Class="d-flex align-center">
+                                            <MudAutocomplete T="CompaniesViewModel" Label="Company" SearchFunc="@SearchAgentCompanies" Value="_selectedCompany" ToStringFunc="@(e=> e==null?null : $"{e.CompanyName}")" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" ValueChanged="OnValueChanged">
+                                            </MudAutocomplete>
+                                            <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@((e) => OpenManageCompanyDialog(null))" Class="ml-3">CREATE NEW COMPANY</MudButton>
+                                        </MudItem>
+                                    }
+                                    @*                                     @if (_usersView.AgentType == 2 && _usersView.RoleType == 1 && _usersView.RoleType == 4)
+                            {
+                            <MudItem xs="12" Class="d-flex align-center">
+                            <MudAutocomplete T="CompaniesViewModel" Label="Company" SearchFunc="@SearchAgentCompanies" Value="_selectedCompany" ToStringFunc="@(e=> e==null?null : $"{e.CompanyName}")" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" ValueChanged="OnValueChanged">
+                            </MudAutocomplete>
+                            <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@((e) => OpenManageCompanyDialog(null))" Class="ml-3">CREATE NEW COMPANY</MudButton>
+                            </MudItem>
+
+                            } *@
+                                }
+                                @if ((RoleType)(_usersView.RoleType ?? 2) == RoleType.Client)
+                                {
+                                    <MudItem xs="12" Class="d-flex align-center">
+                                        <MudAutocomplete T="CompaniesViewModel" Label="Company" SearchFunc="@SearchCompanies" Value="_selectedCompany" ToStringFunc="@(e=> e==null?null : $"{e.CompanyName}")" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" ValueChanged="OnValueChanged">
+                                        </MudAutocomplete>
+                                        <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@((e) => OpenManageCompanyDialog(null))" Class="ml-3">CREATE NEW COMPANY</MudButton>
+                                    </MudItem>
+                                }
+
+                                <MudItem xs="12">
+                                    <MudTextField T="string" @bind-Value="_usersView.EmailAddress" Label="Email Address" Variant="Variant.Outlined" Required="true" RequiredError="Email is required!" Validation="EmailCheck"></MudTextField>
+                                </MudItem>
+
+                                @*       @if (Id != null && Id != Guid.Empty)
+                            {
+                            <MudItem xs="6">
+                            <MudDatePicker Label="Last Login" @bind-Date="_usersView.LastLogin" ReadOnly="true" />
+                            <MudDatePicker Style="margin-top: 20px;" Label="Last Login" @bind-Date="_usersView.LastLogin" ReadOnly="true" />
+                            </MudItem>
+                            } *@
+
+                            </MudGrid>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12">
+                                    <MudSelect T="string" Value="_usersView.AddressType" ValueChanged="ChangeAddress" Label="AddressType" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                                        @foreach (var addressType in _addressTypes)
+                                        {
+                                            if (addressType != "User Address")
+                                            {
+                                                <MudSelectItem Value="@addressType">@addressType</MudSelectItem>
+                                            }
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudGrid>
+
+                                        <MudItem xs="10">
+                                            <MudGooglePlacesAutocomplete T="string" @ref="_googleAddress" @bind-Value="_usersView.Address"
+                                                                         Adornment="Adornment.Start"
+                                                                         AdornmentIcon="@Icons.Material.Filled.Map"
+                                                                         ApiKey="@_googleMapsApiKey" />
+                                        </MudItem>
+                                        <MudItem xs="2" class="text-right">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@((e) => OpenManageCompaniesDialog(null))" />
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudItem>
+                            </MudGrid>
+                        </MudItem>
+
+
+
+                        @* <MudItem xs="3">
+                    <MudSelect T="string" Label="Key Contact" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                    </MudSelect>
+                    </MudItem> *@
+
+                    </MudGrid>
+                </MudPaper>
+            </DialogContent>
+            <DialogActions>
+                <MudButton Variant="Variant.Filled" OnClick="Cancel">Cancel</MudButton>
+                @* <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveUser">Save</MudButton> *@
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveUser">Create</MudButton>
+            </DialogActions>
+        </MudDialog>
+    </MudForm>
+}
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+    [Parameter] public byte? RoleTypeValue { get; set; }
+    [Parameter] public byte? SelectRoleType { get; set; }
+    [Parameter] public Guid? selectedCompany { get; set; }
+    [Parameter] public Boolean? View { get; set; }
+    [Parameter] public Guid? CompanyId { get; set; }
+    private UsersViewModel _usersView = new UsersViewModel();
+    private CompaniesViewModel _selectedCompany = null;
+    private CompaniesViewModel _address = null;
+    private MudForm _form;
+    private bool _loading = true;
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+
+    private string _googleMapsApiKey = "AIzaSyB718DzCLjS6Qdso7x96jciNU3oaNuPExo";
+    private MudBlazor.MudGooglePlacesAutocomplete<string> _googleAddress;
+    private bool selectedAgentType;
+    private List<string> _addressTypes = new List<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+        _usersView.RoleType = SelectRoleType;
+        if (Id != null && Id != Guid.Empty)
+        {
+            await GetUserById();
+            if (_usersView.CompanyId != null && _usersView.CompanyId != Guid.Empty)
+            {
+                _selectedCompany = await CompaniesService.GetCompaniesByIdAsync((Guid)_usersView.CompanyId);
+                if (_selectedCompany != null)
+                {
+                    _usersView.CompanyName = (_selectedCompany.CompanyName == null ? "" : _selectedCompany.CompanyName);
+                     CompanyId = _selectedCompany.Id;
+                    _addressTypes = _selectedCompany.CompanyAdd.Where(add => !string.IsNullOrEmpty(add.AddressType))
+                    .Select(add => add.AddressType).Distinct().ToList();
+                }
+            }
+        }
+        else
+        {
+            _usersView.Password = GetRandomPassword(10);
+            _usersView.IsActive = true;
+            _usersView.RoleType = SelectRoleType;
+            if (RoleTypeValue != null)
+            {
+                _usersView.RoleType = RoleTypeValue;
+                _usersView.CompanyId = selectedCompany;
+
+                if (_usersView.CompanyId != Guid.Empty && _usersView.CompanyId != null)
+                {
+                    _selectedCompany = await CompaniesService.GetCompaniesByIdAsync((Guid)_usersView.CompanyId);
+                    CompanyId = _selectedCompany.companyId;
+                }
+            }
+        }
+
+        _loading = false;
+    }
+
+    private async Task GetUserById()
+    {
+        _usersView = await UsersService.GetUsersByIdAsync((Guid)Id);
+        if (_usersView.RoleType == 3)
+        {
+            selectedAgentType = true;
+        }
+    }
+
+    private async Task ChangeAddress(string newAddress)
+    {
+        if (!string.IsNullOrEmpty(newAddress))
+        {
+            newAddress = newAddress.Trim();
+            var test = CompanyId;
+            _address = await CompaniesService.GetCompaniesByIdAsync((Guid)test);
+            foreach (var addrss in _address.CompanyAdd)
+            {
+                string addressToCompare = addrss.AddressType.Trim();
+                if (newAddress.Equals(addressToCompare, StringComparison.OrdinalIgnoreCase))
+                {
+                    _usersView.Address = addrss.Address;
+                    _usersView.AddressType = newAddress;
+                    break;
+                }
+            }
+        }
+    }
+
+    private async Task<IEnumerable<CompaniesViewModel>> SearchAgentCompanies(string value)
+    {
+        IEnumerable<CompaniesViewModel> companiesView = await CompaniesService.GetAllAgentCompaniesAsync();
+        // companiesView = companiesView.OrderBy(c => c.CompanyName);
+        companiesView = companiesView.Where(c => c.CompanyType == 1);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            companiesView = companiesView.Where(c => c.CompanyName != null && c.CompanyName.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+
+        return companiesView;
+    }
+
+    private async Task<IEnumerable<CompaniesViewModel>> SearchCompanies(string value)
+    {
+        IEnumerable<CompaniesViewModel> companiesView = await CompaniesService.GetAllCompaniesAsync();
+        // companiesView = companiesView.OrderBy(c => c.CompanyName);
+        companiesView = companiesView.Where(c => c.CompanyType == 2);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            companiesView = companiesView.Where(c => c.CompanyName != null && c.CompanyName.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+
+        return companiesView;
+    }
+
+    private async Task OnValueChanged(CompaniesViewModel companiesViewModel)
+    {
+        _selectedCompany = companiesViewModel;
+        _usersView.Address = companiesViewModel.Address;
+        _usersView.AddressType = companiesViewModel.AddressType;
+        CompanyId = _selectedCompany.Id;
+        _selectedCompany = await CompaniesService.GetCompaniesByIdAsync((Guid)CompanyId);
+        _addressTypes = _selectedCompany.CompanyAdd.Where(add => !string.IsNullOrEmpty(add.AddressType))
+                  .Select(add => add.AddressType).Distinct().ToList();
+    }
+
+    private async Task<IEnumerable<string>> SearchCountries(string value)
+    {
+        await Task.Delay(5);
+
+        IEnumerable<string> countries = CountryService.GetAllCountries();
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            countries = countries.Where(c => c != null && c.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+
+        return countries;
+    }
+
+    private string GetRandomPassword(int length)
+    {
+        const string chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        StringBuilder sb = new StringBuilder();
+        Random rnd = new Random();
+
+        for (int i = 0; i < length; i++)
+        {
+            int index = rnd.Next(chars.Length);
+            sb.Append(chars[index]);
+        }
+
+        return sb.ToString();
+    }
+
+    private async Task<IEnumerable<string>> UserNameCheck(string value)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(value))
+            errors.Add("Username is required!");
+
+        if ((value?.Length ?? 0) < 4)
+            errors.Add("Username must be at least of length 4.");
+
+        UsersViewModel userView = await UsersService.GetUsersByUserNameAsync(value, Id);
+        if (userView != null)
+            errors.Add("Username already exist.");
+
+        userView = await UsersService.GetUsersByEmailAddressAsync(value, Id);
+        if (userView != null)
+            errors.Add("Email already exist.");
+
+        return errors;
+    }
+
+    private async Task<IEnumerable<string>> EmailCheck(string value)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(value))
+            errors.Add("Email is required!");
+
+        if (!new EmailAddressAttribute().IsValid(value))
+            errors.Add("Email is invalid.");
+
+        UsersViewModel userView = await UsersService.GetUsersByEmailAddressAsync(value, Id);
+        if (userView != null)
+            errors.Add("Email already exist.");
+
+        userView = await UsersService.GetUsersByUserNameAsync(value, Id);
+        if (userView != null)
+            errors.Add("Username already exist.");
+
+        return errors;
+    }
+
+    private async Task SaveUser()
+    {
+        await _form.Validate();
+
+        if (_form.IsValid)
+        {
+            try
+            {
+                // The address must be retrieved from the referenced input because when picking it by clicking in google places the bound value is not updated
+                string id = _googleAddress.InputReference.FieldId;
+                string address = await JS.InvokeAsync<string>("getInputValue", new object[] { id });
+                _usersView.Address = address;
+
+                _usersView.Updated = DateTime.UtcNow;
+                _usersView.UpdatedBy = _currentLoginUser.Id;
+                _usersView.CompanyId = _selectedCompany?.Id;
+
+                if (Id != null && Id != Guid.Empty)
+                {
+                    _usersView.AddressType = _usersView.AddressType;
+                    await UsersService.UpdateUsersAsync(_usersView);
+                    Snackbar.Add("Successfully saved user information.", Severity.Success);
+                }
+                else
+                {
+                    _usersView.Created = DateTime.UtcNow;
+                    _usersView.CreatedBy = _currentLoginUser.Id;
+                    await UsersService.InsertUsersAsync(_usersView);
+
+                    UsersViewModel addedData = await UsersService.GetLastUsersAsync();
+                    Id = addedData.Id;
+
+                    Guid passwordResetRequestId = await UsersService.RequestResetPasswordAsync(addedData.EmailAddress);
+                    NewAccountTemplate uprr = new NewAccountTemplate();
+                    await uprr.Initialized(configuration.GetValue<string>("SiteUrl"), addedData.FirstName, passwordResetRequestId, _usersView.Password, addedData.EmailAddress, addedData.ccEmail);
+                    // await EMailService.SendEmailNotificationAsync(uprr, addedData.EmailAddress, null);
+                    // SendEmailCCTemplate sendEmailCC = new SendEmailCCTemplate(addedData.FirstName);
+                    // await EMailService.SendEmailNotificationAsync(sendEmailCC, addedData.ccEmail, null);
+                    Snackbar.Add("Successfully saved user information.An email was sent to the user's email address with a link to change the password. The link is valid for 15 minutes.", Severity.Success);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add("Error! Please try again.", Severity.Error);
+            }
+
+            MudDialog.Close(DialogResult.Ok(Id));
+        }
+    }
+
+    private async Task OpenManageCompanyDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<ManageCompany>();
+        parameters.Add(x => x.Id, Id);
+        parameters.Add(x => x.companytype, _usersView.RoleType);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageCompany>("Company", parameters, options).Result;
+
+        if (!result.Canceled && result.Data != null)
+        {
+            _usersView.CompanyId = (Guid)result?.Data;
+            if (_usersView.CompanyId != null && _usersView.CompanyId != Guid.Empty)
+            {
+                _selectedCompany = await CompaniesService.GetCompaniesByIdAsync((Guid)_usersView.CompanyId);
+                _addressTypes = _selectedCompany.CompanyAdd.Where(add => !string.IsNullOrEmpty(add.AddressType))
+                .Select(add => add.AddressType).Distinct().ToList();
+                _usersView.Address = _selectedCompany.Address;
+                _usersView.AddressType = _selectedCompany.AddressType;
+                
+            }
+        }
+        else{
+               _selectedCompany = await CompaniesService.GetLastCompaniesAsync();
+            _addressTypes = _selectedCompany.CompanyAdd.Where(add => !string.IsNullOrEmpty(add.AddressType))
+             .Select(add => add.AddressType).Distinct().ToList();
+        _usersView.Address = _selectedCompany.Address;
+        _usersView.AddressType = _selectedCompany.AddressType;
+        }
+     
+    }
+    private async Task OpenManageCompaniesDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<AddCompany>();
+        parameters.Add(x => x.Id, CompanyId);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<AddCompany>("User Address", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            var updatedAddress = result.Data?.ToString();
+            if (!string.IsNullOrEmpty(updatedAddress))
+            {
+                // Use regular expression to extract the value of "UpdatedAddress" and "AddressType"
+                var addressMatch = Regex.Match(updatedAddress, @"UpdatedAddress\s*=\s*(.+?),\s*AddressType");
+                var typeMatch = Regex.Match(updatedAddress, @"AddressType\s*=\s*(.+?)\s*\}");
+                if (addressMatch.Success && addressMatch.Groups.Count > 1 && typeMatch.Success && typeMatch.Groups.Count > 1)
+                {
+                    // Access the captured values and update the user view
+                    var extractedAddress = addressMatch.Groups[1].Value.Trim();
+                    var extractedType = typeMatch.Groups[1].Value.Trim();
+                    _usersView.Address = extractedAddress;
+                    _usersView.AddressType = extractedType;
+                }
+            }
+            // _usersView.CompanyId = (Guid)result.Data;
+            // if (_usersView.CompanyId != null && _usersView.CompanyId != Guid.Empty)
+            // {
+            //     _selectedCompany = await CompaniesService.GetCompaniesByIdAsync((Guid)_usersView.CompanyId);
+            //     _usersView.Address = _selectedCompany.Address;
+            // }
+        }
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

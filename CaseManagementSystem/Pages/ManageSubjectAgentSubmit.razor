@@ -1,0 +1,501 @@
+﻿@using CMS.DL.DM
+@using CMS.DL.Model
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Cases
+@using CaseManagementSystem.Data.Companies
+@using CaseManagementSystem.Data.Enum
+@using CaseManagementSystem.Data.Subjects
+@using CaseManagementSystem.Data.Users;
+@using System.Text.RegularExpressions;
+
+@inject UsersService UserService
+@inject SubjectService SubjectService
+@inject CaseService CaseService;
+@inject ISnackbar Snackbar
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject IJSRuntime JS;
+@inject IDialogService Dialog;
+
+<MudDivider />
+
+<MudForm @ref="_form">
+    <MudDialog>
+        <DialogContent>
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="@Color.Info" Style="position:absolute;top:0;right:0" />
+            }
+            <MudPaper Elevation="0">
+                <MudGrid Spacing="6">
+                    <MudItem xs="12">
+
+                        @if (_ixQuestion == 1)
+                        {
+                            <MudItem xs="8">
+                            <MudSelect T="string" @bind-Value="_traceResult" Placeholder="Have you traced the subject?">
+                                <MudSelectItem Value="@("Living As Stated")">Living As Stated</MudSelectItem>
+                                <MudSelectItem Value="@("Positive")">Positive</MudSelectItem>
+                                <MudSelectItem Value="@("Positive - see Notes")">Positive - see Notes</MudSelectItem>
+                                <MudSelectItem Value="@("Negative")">Negative</MudSelectItem>
+                            </MudSelect>
+                            </MudItem>
+                        }
+
+                        @if (_traceResult != "Living As Stated" && _traceResult != "Negative" && _ixQuestion == 2)
+                        {
+
+
+                            <MudPaper Elevation="0">
+                                <MudGrid Spacing="2">
+                                    <p>What is the new address?</p>
+                                    <MudItem xs="12"></MudItem>
+                                    <MudItem xs="6">
+                                        <MudSelect T="string" @bind-Value="_caseTraceQuestions.CountryName" Label="CountryName" Variant="Variant.Outlined" Required="true">
+                                            @foreach (string Countries in GetAllCountries())
+                                            {
+                                                <MudSelectItem Value="Countries">@Countries</MudSelectItem>
+                                            }
+                                        </MudSelect>
+
+                                    </MudItem>
+                                    @if (_caseTraceQuestions.CountryName != "United Kingdom")
+                                    {
+                                        <MudItem xs="6">
+                                            <MudGooglePlacesAutocomplete T="string" @ref="_googleAddress" @bind-Value="_q3"
+                                                                         Adornment="Adornment.Start"
+                                                                         AdornmentIcon="@Icons.Material.Filled.Map"
+                                                                         ApiKey="@_googleMapsApiKey" Required="true" />
+                                        </MudItem>
+                                    }
+                                    @if (_caseTraceQuestions.CountryName == "United Kingdom")
+                                    {
+                                        <MudItem xs="4">
+                                            <input style="width: 100%; border-bottom: 1px solid #ccc; height: 54px; padding-left:10px" id="addressInput" class="mud-input-root mud-input-text" @bind="_q3"
+                                                   placeholder="Type or select an address" Required="true" />
+                                            @if (IsLoading)
+                                            {
+                                                <MudOverlay Visible="true" DarkBackground="true" ZIndex="9999">
+                                                    <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+                                                </MudOverlay>
+                                            }
+                                        </MudItem>
+                                        <MudItem xs="2">
+                                            <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="HandleKeyUp" Class="ml-3">Look Up</MudButton>
+                                        </MudItem>
+
+                                        <MudItem xs="6">
+                                            <MudTextField T="string" id="Address1" placeholder="Address line 1" Variant="Variant.Outlined"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="6">
+                                            <MudTextField T="string" id="Address2" placeholder="Address line 2" Variant="Variant.Outlined"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="6">
+                                            <MudTextField T="string" id="Address3" placeholder="Address line 3" Variant="Variant.Outlined"></MudTextField>
+                                        </MudItem>
+                                        @*    <MudItem xs="6">
+                                <MudTextField T="string" id="BuildingNo" placeholder="Building Number" Variant="Variant.Outlined"></MudTextField>
+                                </MudItem> *@
+                                        <MudItem xs="6">
+                                            <MudTextField T="string" id="Town" placeholder="Town" Variant="Variant.Outlined"></MudTextField>
+                                        </MudItem>
+                                     @*    <MudItem xs="6">
+                                            <MudTextField T="string" id="Country" placeholder="Country" Variant="Variant.Outlined"></MudTextField>
+                                        </MudItem> *@
+                                        <MudItem xs="6">
+                                            <MudTextField T="string" id="PostCode" placeholder="Post Code" Variant="Variant.Outlined"></MudTextField>
+                                        </MudItem>
+
+                                    }
+
+                                </MudGrid>
+                            </MudPaper>
+
+                        }
+
+                        @if (_ixQuestion == 3)
+                        {
+                            <MudItem xs="8">
+                            <MudSelect T="string" @bind-Value="_howVerified" @bind-SelectedValues="_howVerifiedOptions" Placeholder="Sources Consulted" Required="true" MultiSelection="true">
+                                <MudSelectItem Value="@("Electoral Roll")">Electoral Roll</MudSelectItem>
+                                <MudSelectItem Value="@("Telephone subscription")">Telephone subscription</MudSelectItem>
+                                <MudSelectItem Value="@("Ex-directory telephone subscription")">Ex-directory telephone subscription</MudSelectItem>
+                                <MudSelectItem Value="@("Human source – spoke to subject")">Human source – spoke to subject</MudSelectItem>
+                                <MudSelectItem Value="@("Human source – spoke to neighbour or similar")">Human source – spoke to neighbour or similar</MudSelectItem>
+                            </MudSelect>
+                            </MudItem>
+                        }
+
+                        @if (_ixQuestion == 4)
+                        {
+                            if (_traceResult != "Positive")
+                            {
+                                <MudTextField T="string" @bind-Value="_q4" Label="Agent Notes" Required="true" Variant="Variant.Outlined" Clearable="true" Lines="3" />
+                            }
+                            else
+                            {
+                                <MudTextField T="string" @bind-Value="_q4" Label="Agent Notes" Variant="Variant.Outlined" Clearable="true" Lines="3" />
+
+                            }
+                        }
+                    </MudItem>
+                    <MudTd></MudTd>
+
+
+                </MudGrid>
+            </MudPaper>
+            <MudTd></MudTd>
+
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Filled" OnClick="Cancel">Cancel</MudButton>
+            @if (_ixQuestion > 1)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Previous">Previous</MudButton>
+            }
+            @if (_ixQuestion < _questionCount)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Next">Next</MudButton>
+            }
+            else
+            {
+                <MudTooltip Text="Checkout or Uncheckout Case" Color="Color.Primary" Placement="Placement.Top">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Next">
+                        @ButtonText
+                    </MudButton>
+                </MudTooltip>
+                @* <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Next">Submit For review</MudButton> *@
+            }
+
+        </DialogActions>
+    </MudDialog>
+</MudForm>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+    [Parameter] public Guid CaseId { get; set; }
+    [Parameter] public CaseStatusType? CaseStatus { get; set; }
+    [Parameter] public List<SubjectCaseTraceQuestions> PreviousTraceQuestions { get; set; }
+
+    private MudForm _form;
+    private bool _loading = true;
+    private string _traceResult = string.Empty;
+    private string _q3 = string.Empty;
+    private string _q4 = string.Empty;
+
+    private string _howVerified { get; set; } = "Nothing selected";
+    private IEnumerable<string> _howVerifiedOptions { get; set; } = new HashSet<string>() { };
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+    private int _ixQuestion = 1;
+    private int _questionCount = 4;
+    private string _googleMapsApiKey = "AIzaSyB718DzCLjS6Qdso7x96jciNU3oaNuPExo";
+    private MudBlazor.MudGooglePlacesAutocomplete<string>? _googleAddress;
+    private string _getAddressKey = "phQiuTiB8UmDxHChlVxl-Q42028";
+    private MudBlazor.MudGooglePlacesAutocomplete<string> _getAddress;
+    private CaseTraceQuestions _caseTraceQuestions = new CaseTraceQuestions();
+    private List<CaseTraceQuestions> _caseTrace = new List<CaseTraceQuestions>();
+    private bool IsLoading { get; set; }
+    private CompaniesViewModel _companiesView = new CompaniesViewModel();
+    CaseViewModel _caseViewModel = new CaseViewModel();
+    private bool IsNext => _caseViewModel.TraceLevelName == "SL1";
+    private string ButtonText => IsNext ? "Next" : "Submit For review";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentLoginUser = await UserService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+        _googleAddress = new MudGooglePlacesAutocomplete<string>();
+        if (CaseId != null)
+        {
+            _caseViewModel = await CaseService.GetCasesByIdAsync((Guid)CaseId);
+        }
+        _caseTraceQuestions.CountryName = "United Kingdom";
+        if (PreviousTraceQuestions?.Count == 4)
+        {
+            _traceResult = PreviousTraceQuestions[0].Answer;
+            _q3 = PreviousTraceQuestions[1].Answer;
+            _howVerified = PreviousTraceQuestions[2].Answer;
+            _howVerifiedOptions = PreviousTraceQuestions[2].Answer.Split(", ");
+            _q4 = PreviousTraceQuestions[3].Answer;
+        }
+        _loading = false;
+    }
+    private async Task HandleKeyUp()
+    {
+        IsLoading = true;
+        string id = "addressInput";
+        string text = await JS.InvokeAsync<string>("getInputValue", new object[] { id });
+        await RunFunctionOnKeyUp(text);
+        await JS.InvokeVoidAsync("addFocus", new object[] { id });
+        await Task.Delay(1000);
+        IsLoading = false;
+    }
+    private async Task RunFunctionOnKeyUp(string inputValue)
+    {
+        Console.WriteLine($"Input value on key-up: {inputValue}");
+        await InitializeGetAddressAutocomplete();
+    }
+    public List<string> GetAllCountries()
+    {
+        CountryDM countryDM = new CountryDM();
+        List<string> allCountries = countryDM.GetAllCountries();
+        return countryDM.GetAllCountries(); ;
+    }
+    private async Task InitializeGetAddressAutocomplete()
+    {
+        await JS.InvokeVoidAsync("Country", "addressInput", "j4DD-Sgv1Uis3NtYnXW_CQ15746");
+    }
+    private async Task Previous()
+    {
+        if (_ixQuestion > 1)
+            _ixQuestion--;
+    }
+
+    private async Task OpenFilePopup()
+    {
+        var parameters = new DialogParameters<UploadFile>();
+        parameters.Add(x => x.Email, _caseViewModel.ClientEmail);
+        parameters.Add(y => y.Id, _caseViewModel.Id);
+        parameters.Add(y => y.SubjectId, _caseViewModel.SubjectId);
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        DialogResult result = await Dialog.Show<UploadFile>("Upload File", parameters, options).Result;
+    }
+    // private async Task Next()
+    // {
+    //     if (_ixQuestion < _questionCount)
+    //     {
+    //         if (_caseTraceQuestions.CountryName == "United Kingdom" && _ixQuestion == 2)
+    //         {
+
+    //             string[] Address = { "Address1", "Address2", "BuildingNo", "Town", "PostCode" };
+    //             string address = await JS.InvokeAsync<string>("getInputValueAddress", new object[] { Address });
+    //             _q3 = address;
+    //         }
+    //         _ixQuestion++;
+    //     }
+    //     else if (_ixQuestion == _questionCount)
+    //     {
+    //         try
+    //         {
+    //             _caseTrace.Add(new CaseTraceQuestions() { Id = Guid.NewGuid(), CaseId = CaseId, Question = "Have you traced the subject?", Answer = _traceResult, Created = DateTime.UtcNow, CreatedBy = (Guid)_currentLoginUser.Id });
+    //             _caseTrace.Add(new CaseTraceQuestions() { Id = Guid.NewGuid(), CaseId = CaseId, Question = "What is the new address?", Answer = _q3, Created = DateTime.UtcNow, CreatedBy = (Guid)_currentLoginUser.Id });
+    //             _caseTrace.Add(new CaseTraceQuestions() { Id = Guid.NewGuid(), CaseId = CaseId, Question = "Sources Consulted", Answer = string.Join(", ", _howVerifiedOptions), Created = DateTime.UtcNow, CreatedBy = (Guid)_currentLoginUser.Id });
+    //             _caseTrace.Add(new CaseTraceQuestions() { Id = Guid.NewGuid(), CaseId = CaseId, Question = "Agent Notes", Answer = _q4, Created = DateTime.UtcNow, CreatedBy = (Guid)_currentLoginUser.Id });
+    //             await CaseService.UpdateCaseTraceQuestions((Guid)CaseId, _caseTrace);
+    //             CaseViewModel agentCase = await CaseService.GetCasesByIdAsync((Guid)CaseId);
+    //             var ApprovedCount = await CaseService.GetApprovedCasesCount(agentCase.EndClient);
+    //             if (ApprovedCount < 10)
+    //             {
+    //                 agentCase.Status = (byte)CaseStatusType.REVIEW;
+    //                 agentCase.Updated = DateTime.UtcNow;
+    //             }
+    //             // int ApprovedCount = 0;
+    //             // if (agentCase != null && agentCase.EndClient != null)
+    //             // {
+    //             //     ApprovedCount = await CaseService.GetApprovedCasesCount(agentCase.EndClient);
+    //             // }
+    //             // if (ApprovedCount < 10)
+    //             // {
+    //             //     agentCase.Status = (byte)CaseStatusType.REVIEW;
+    //             //     agentCase.Updated = DateTime.UtcNow;
+    //             // }
+    //             else
+    //             {
+    //                 if (_caseTrace[0].Answer == "Positive - see Notes")
+    //                 {
+    //                     agentCase.Status = (byte)CaseStatusType.REVIEW;
+    //                     agentCase.Updated = DateTime.UtcNow;
+    //                 }
+    //             }
+    //             await CaseService.UpdateCasesAsync(agentCase);
+    //             await SubjectService.GetAllSubjectsWithCaseByAgentAsync(_currentLoginUser.Id);
+    //             MudDialog.Close(DialogResult.Ok(_caseTrace));
+    //         }
+    //         catch (Exception er)
+    //         {
+    //             throw er;
+    //         }
+
+    //     }
+    // }
+    private async Task Next()
+    {
+        try
+        {
+            if (_ixQuestion == 1 && (_traceResult == "Living As Stated" || _traceResult == "Negative"))
+            {
+                _ixQuestion = 3;
+            }
+            else if (_ixQuestion < _questionCount)
+            {
+                if (_ixQuestion == 2)
+                {
+                    if (_caseTraceQuestions.CountryName == "United Kingdom")
+                    {
+                        string[] AddressFields = { "Address1", "Address2", "Address3", "Town", "PostCode" };
+                        string address = await JS.InvokeAsync<string>("getInputValueAddress", new object[] { AddressFields });
+                        if (!string.IsNullOrEmpty(address))
+                        {
+                            _q3 = address;
+                            _ixQuestion++;
+                        }
+                        else
+                        {
+                            return;
+                        }
+                    }
+                    else if (_caseTraceQuestions.CountryName != null)
+                    {
+                        if (!string.IsNullOrEmpty(_q3))
+                        {
+                            _ixQuestion++;
+                        }
+                        else
+                        {
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    _ixQuestion++;
+                }
+            }
+            else if (_ixQuestion == _questionCount)
+            {
+                if (_caseViewModel.TraceLevelName == "SL1")
+                {  
+                    if (_traceResult == "Positive - see Notes")
+                    {
+                        if (_q4 != "")
+                        {
+                            await OpenFilePopup();
+                            MudDialog.Close(DialogResult.Ok(_caseTrace));
+                        }
+                        else
+                        {
+                            Snackbar.Add(" Agent Notes Empty.", Severity.Error);
+                        }
+                    }
+                    else
+                    {
+                        await OpenFilePopup();
+                        MudDialog.Close(DialogResult.Ok(_caseTrace));
+                    }
+                }
+                // Prepare case trace questions for submission
+                _caseTrace.Add(new CaseTraceQuestions() { Id = Guid.NewGuid(), CaseId = CaseId, Question = "Have you traced the subject?", Answer = _traceResult, Created = DateTime.UtcNow, CreatedBy = (Guid)_currentLoginUser.Id });
+                _caseTrace.Add(new CaseTraceQuestions() { Id = Guid.NewGuid(), CaseId = CaseId, Question = "What is the new address?", Answer = _q3, Created = DateTime.UtcNow, CreatedBy = (Guid)_currentLoginUser.Id });
+                _caseTrace.Add(new CaseTraceQuestions() { Id = Guid.NewGuid(), CaseId = CaseId, Question = "Sources Consulted", Answer = string.Join(", ", _howVerifiedOptions), Created = DateTime.UtcNow, CreatedBy = (Guid)_currentLoginUser.Id });
+                _caseTrace.Add(new CaseTraceQuestions() { Id = Guid.NewGuid(), CaseId = CaseId, Question = "Agent Notes", Answer = _q4, Created = DateTime.UtcNow, CreatedBy = (Guid)_currentLoginUser.Id });
+                if (_traceResult == "Positive - see Notes")
+                {
+                    if (_q4 != "")
+                    {
+                        await CaseService.UpdateCaseTraceQuestions((Guid)CaseId, _caseTrace);
+                        CaseViewModel agentCase = await CaseService.GetCasesByIdAsync((Guid)CaseId);
+                        var ApprovedCount = await CaseService.GetApprovedCasesCount(agentCase.EndClient);
+
+                        if (ApprovedCount < 10 || _caseTrace[0].Answer == "Positive - see Notes")
+                        {
+                            if (_caseViewModel.TraceLevelName != "SL1")
+                            {
+                                agentCase.Status = (byte)CaseStatusType.REVIEW;
+                                agentCase.EndClient = _currentLoginUser.Id;
+                            }
+                            agentCase.Updated = DateTime.UtcNow;
+                        }
+
+                        await CaseService.UpdateCasesAsync(agentCase);
+                        await SubjectService.GetAllSubjectsWithCaseByAgentAsync(_currentLoginUser.Id);
+                        MudDialog.Close(DialogResult.Ok(_caseTrace));
+                    }
+                    else
+                    {
+                        Snackbar.Add(" Agent Notes Empty.", Severity.Error);
+                    }
+                }
+                else if (_traceResult == "Positive")
+                {
+                    if (_q3 != ", ,  , ,  ")
+                    {
+                        await CaseService.UpdateCaseTraceQuestions((Guid)CaseId, _caseTrace);
+                        CaseViewModel agentCase = await CaseService.GetCasesByIdAsync((Guid)CaseId);
+                        var ApprovedCount = await CaseService.GetApprovedCasesCount(agentCase.EndClient);
+
+                        if (ApprovedCount < 10 || _caseTrace[0].Answer == "Positive - see Notes")
+                        {
+                            if (_caseViewModel.TraceLevelName != "SL1")
+                            {
+                                agentCase.Status = (byte)CaseStatusType.REVIEW;
+                                agentCase.EndClient = _currentLoginUser.Id;
+                            }
+                            agentCase.Updated = DateTime.UtcNow;
+                        }
+
+                        await CaseService.UpdateCasesAsync(agentCase);
+                        await SubjectService.GetAllSubjectsWithCaseByAgentAsync(_currentLoginUser.Id);
+                        MudDialog.Close(DialogResult.Ok(_caseTrace));
+                    }
+                    else
+                    {
+                        Snackbar.Add(" Address is Empty.", Severity.Error);
+                    }
+                }
+                else if (_traceResult == "Positive - see Notes")
+                {
+                    if (_q3 != ", ,  , ,  " && _q4 != "")
+                    {
+                        await CaseService.UpdateCaseTraceQuestions((Guid)CaseId, _caseTrace);
+                        CaseViewModel agentCase = await CaseService.GetCasesByIdAsync((Guid)CaseId);
+                        var ApprovedCount = await CaseService.GetApprovedCasesCount(agentCase.EndClient);
+
+                        if (ApprovedCount < 10 || _caseTrace[0].Answer == "Positive - see Notes")
+                        {
+                            if (_caseViewModel.TraceLevelName != "SL1")
+                            {
+                                agentCase.Status = (byte)CaseStatusType.REVIEW;
+                                agentCase.EndClient = _currentLoginUser.Id;
+                            }
+                            agentCase.Updated = DateTime.UtcNow;
+                        }
+                        await CaseService.UpdateCasesAsync(agentCase);
+                        await SubjectService.GetAllSubjectsWithCaseByAgentAsync(_currentLoginUser.Id);
+                        MudDialog.Close(DialogResult.Ok(_caseTrace));
+                    }
+                    else
+                    {
+                        Snackbar.Add(" Address Or Agent Notes is Empty.", Severity.Error);
+                    }
+                }
+                else
+                {
+                    await CaseService.UpdateCaseTraceQuestions((Guid)CaseId, _caseTrace);
+                    //Retrieve updated case details
+                    CaseViewModel agentCase = await CaseService.GetCasesByIdAsync((Guid)CaseId);
+                    var ApprovedCount = await CaseService.GetApprovedCasesCount(agentCase.EndClient);
+                    // if (ApprovedCount < 10 || _caseTrace[0].Answer == "Positive - see Notes")
+                    // {
+                    agentCase.Status = (byte)CaseStatusType.REVIEW;
+                    agentCase.EndClient = _currentLoginUser.Id;
+                    agentCase.Updated = DateTime.UtcNow;
+                    // }
+                    await CaseService.UpdateCasesAsync(agentCase);
+                    await SubjectService.GetAllSubjectsWithCaseByAgentAsync(_currentLoginUser.Id);
+                    MudDialog.Close(DialogResult.Ok(_caseTrace));
+                }
+
+            }
+        }
+        catch (Exception er)
+        {
+            Console.WriteLine(er.Message);
+        }
+    }
+
+
+    void Cancel() => MudDialog.Cancel();
+}

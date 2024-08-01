@@ -1,0 +1,547 @@
+﻿@page "/companymanagement"
+
+@using System.Net.Http.Json
+@using CaseManagementSystem.Data.Cases;
+@using CaseManagementSystem.Data.Companies
+@using CaseManagementSystem.Data.Auth;
+@using System.Data;
+@using System.Net;
+@using System.Text;
+@using Microsoft.AspNetCore.WebUtilities;
+
+@inject IDialogService Dialog
+@inject CaseService CaseService
+@inject CompaniesService CompaniesService
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS;
+<style>
+    .selected {
+        background-color: #1E88E5 !important;
+    }
+
+    .company-list-th {
+        color: #5c6479 !important;
+        font-size: 13px;
+    }
+
+    tbody td {
+        width: 25%;
+        font-size: 14px;
+        color: #5c6479 !important;
+    }
+
+    .name-colm {
+        font-size: 14px;
+        color: #000 !important;
+        font-weight: 400;
+    }
+
+    .selected > td .mud-input {
+        color: white !important;
+    }
+
+    .mud-tabs-toolbar-content {
+        width: fit-content !important;
+        flex: 0 1 auto !important;
+    }
+
+    .mud-tabs-toolbar .mud-tabs-toolbar-inner {
+        justify-content: center;
+    }
+
+    .mud-table {
+        box-shadow: 0 0.5rem 1.5rem 0.5rem #eaeaea96;
+        border: 1px solid #5c64792b
+    }
+
+    .form-control .mud-input-control {
+        display: block;
+        width: 100%;
+        padding: 0.3rem 1rem;
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #5c6479;
+        appearance: none;
+        background-color: #5c64791f;
+        background-clip: padding-box;
+        border: 1px solid #5c647936;
+        border-radius: 0.475rem;
+        box-shadow: false;
+        transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    }
+
+    .mud-input.mud-input-underline:before {
+        border-bottom: 0px
+    }
+
+    .mud-input-control > .mud-input-control-input-container > div.mud-input.mud-input-text {
+        margin-top: 0px;
+    }
+
+    .mud-tabs.mud-tabs-rounded {
+        position: relative;
+    }
+
+        .mud-tabs.mud-tabs-rounded .mud-tabs-toolbar {
+            position: absolute;
+            top: 8px;
+            z-index: 99;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+    .mud-tab {
+        min-width: 90px !important;
+        max-width: 120px !important
+    }
+
+
+
+    .export-btn {
+        position: absolute;
+        top: 18px;
+        right: 2%;
+        z-index: 999;
+    }
+
+    .mud-table-root {
+        padding-top: 8px;
+    }
+
+    .name-colm {
+        color: #000;
+        font-size: 14px;
+    }
+
+
+    .mud-button-filled.mud-button-filled-primary {
+        background-color: #774991 !important;
+    }
+
+        .mud-button-filled.mud-button-filled-primary:hover, .mud-button-filled.mud-button-filled-primary:focus-visible {
+            background-color: #995FBA !important;
+        }
+
+    .mud-primary-text {
+        color: #774991 !important;
+    }
+
+    .mud-tab.mud-tab-active {
+        color: #774991;
+
+    }
+    .mud-tab-slider{
+        background: #774991 !important;
+    }
+</style>
+
+<PageTitle>Company Management</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-2"> <b>Company Management</b></MudText>
+<MudTabs class=" tab-btn" Rounded="true" ApplyEffectsToContainer="true" PanelClass="">
+    <MudTabPanel Text="All">
+        <div class="d-flex export-btn align-content-center justify-end mb-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportCompanyDataCsv(0))">Export to CSV</MudButton>
+            @if(CustomAuthenticationStateProvider.RoleType() != "Internal")
+            {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OpenManageCompanyDialog(null, 0))">Create</MudButton>
+            }
+        </div>
+        <MudTable Items="@_companies" Hover="true" AllowUnsorted="false" Filter=" new Func<CompaniesViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+            @*  <ToolBarContent>
+            <MudText Typo="Typo.h6">Company Management</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </ToolBarContent> *@
+            <ToolBarContent>
+                <div class="d-flex justify-space-between align-items-center flex-grow-1">
+                <div class="form-control">
+                    <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                </div>
+                </div>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<CompaniesViewModel, object>(x=>x.CompanyName)"><span class="company-list-th ">Name</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.KeyContact)"><span class="company-list-th">Contact</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.KeyContactRole)"><span class="company-list-th">Contact Position</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.Address)"><span class="company-list-th">Address</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.AddressType)"><span class="company-list-th">AddressType</span></MudTableSortLabel></MudTd>
+                <MudTh></MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd class="name-colm" DataLabel="Name">@context.CompanyName</MudTd>
+                <MudTd DataLabel="Contact">@context.KeyContact</MudTd>
+                <MudTd DataLabel="Contact Position">@context.KeyContactRole</MudTd>
+                <MudTd DataLabel="Address Type">@context.Address</MudTd>
+                <MudTd DataLabel="Address">@context.AddressType</MudTd>
+                @if (CustomAuthenticationStateProvider.RoleType() != "Internal")
+                {
+                    <MudTd DataLabel="Edit" style="padding: 0; margin: 0;">
+                        <MudTooltip Text="Edit Company" Color="Color.Primary" Placement="Placement.Top">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCompanyDialog(@context.Id, 0))"></MudIconButton>
+                        </MudTooltip>
+                    </MudTd>
+                    <MudTd DataLabel="Remove" style="padding: 6px; margin: 0;">
+                        <MudTooltip Text="Remove Company" Color="Color.Primary" Placement="Placement.Top">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveCompany(@context.Id))"></MudIconButton>
+                        </MudTooltip>
+                    </MudTd>
+                }
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudTabPanel>
+    <MudTabPanel Text="Admin">
+        <div class="d-flex export-btn align-content-center justify-end mb-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportCompanyDataCsv(3))">Export to CSV</MudButton>
+            @if (CustomAuthenticationStateProvider.RoleType() != "Internal")
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OpenManageCompanyDialog(null, 1))">Create</MudButton>
+            }
+        </div>
+        <MudTable class="pa-4" Items="@_companies.Where(c => c.CompanyType ==3)" Hover="true" AllowUnsorted="false" Filter=" new Func<CompaniesViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+            <ToolBarContent>
+                <div class="form-control">
+
+                    <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                </div>
+
+            </ToolBarContent>
+            <HeaderContent>
+
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<CompaniesViewModel, object>(x=>x.CompanyName)"><span class="company-list-th">Name</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.KeyContact)"><span class="company-list-th">Contact</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.KeyContactRole)"><span class="company-list-th">Contact Position</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.Address)"><span>Address</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.AddressType)"><span class="company-list-th">AddressType</span></MudTableSortLabel></MudTd>
+                <MudTh></MudTh>
+                <MudTh></MudTh>
+
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">@context.CompanyName</MudTd>
+                <MudTd DataLabel="Contact">@context.KeyContact</MudTd>
+                <MudTd DataLabel="Contact Position">@context.KeyContactRole</MudTd>
+                <MudTd DataLabel="Address">@context.Address</MudTd>
+                <MudTd DataLabel="Address">@context.AddressType</MudTd>
+                @if (CustomAuthenticationStateProvider.RoleType() != "Internal")
+                {
+                    <MudTd DataLabel="Edit" style="padding: 0; margin: 0;">
+                        <MudTooltip Text="Edit Company" Color="Color.Primary" Placement="Placement.Top">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCompanyDialog(@context.Id, 1))"></MudIconButton>
+                        </MudTooltip>
+                    </MudTd>
+                    <MudTd DataLabel="Remove" style="padding: 0; margin: 0;">
+                        <MudTooltip Text="Remove Company" Color="Color.Primary" Placement="Placement.Top">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveCompany(@context.Id))"></MudIconButton>
+                        </MudTooltip>
+                    </MudTd>
+                }
+             
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudTabPanel>
+    <MudTabPanel Text="Agent">
+        <div class="d-flex export-btn align-content-center justify-end mb-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportCompanyDataCsv(1))">Export to CSV</MudButton>
+            @if(CustomAuthenticationStateProvider.RoleType() != "Internal")
+            {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OpenManageCompanyDialog(null, 3))">Create</MudButton>
+            }
+        </div>
+        <MudTable class="pa-4" Items="@_companies.Where(c => c.CompanyType ==1)" Hover="true" AllowUnsorted="false" Filter=" new Func<CompaniesViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+            <ToolBarContent>
+                <div class="form-control">
+
+                    <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                </div>
+
+            </ToolBarContent>
+            <HeaderContent>
+
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<CompaniesViewModel, object>(x=>x.CompanyName)"> <span class="company-list-th">Name</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.KeyContact)"><span class="company-list-th">Contact</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.KeyContactRole)"><span class="company-list-th">Contact Position</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.Address)"><span class="company-list-th">Address</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.AddressType)"><span class="company-list-th">AddressType</span></MudTableSortLabel></MudTd>
+                <MudTh></MudTh>
+                <MudTh></MudTh>
+
+            </HeaderContent>
+            <RowTemplate>
+
+                <MudTd DataLabel="Name">@context.CompanyName</MudTd>
+                <MudTd DataLabel="Contact">@context.KeyContact</MudTd>
+                <MudTd DataLabel="Contact Position">@context.KeyContactRole</MudTd>
+                <MudTd DataLabel="Address">@context.Address</MudTd>
+                <MudTd DataLabel="Address">@context.AddressType</MudTd>
+                @if (CustomAuthenticationStateProvider.RoleType() != "Internal")
+                {
+                    <MudTd DataLabel="Edit" style="padding: 0; margin: 0;">
+                        <MudTooltip Text="Edit Company" Color="Color.Primary" Placement="Placement.Top">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCompanyDialog(@context.Id, 3))"></MudIconButton>
+                        </MudTooltip>
+                    </MudTd>
+                    <MudTd DataLabel="Remove" style="padding: 0; margin: 0;">
+                        <MudTooltip Text="Remove Company" Color="Color.Primary" Placement="Placement.Top">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveCompany(@context.Id))"></MudIconButton>
+                    </MudTooltip>
+                </MudTd>
+                }
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudTabPanel>
+    <MudTabPanel Text="Client">
+        <div class="d-flex export-btn align-content-center justify-end mb-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportCompanyDataCsv(2))">Export to CSV</MudButton>
+            @if(CustomAuthenticationStateProvider.RoleType() != "Internal")
+            {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OpenManageCompanyDialog(null, 2))">Create</MudButton>
+            }
+        </div>
+        <MudTable class="pa-4" Items="@_companies.Where(c => c.CompanyType ==2)" Hover="true" AllowUnsorted="false" Filter=" new Func<CompaniesViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+            <ToolBarContent>
+                <div class="form-control">
+
+                    <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                </div>
+
+            </ToolBarContent>
+            <HeaderContent>
+
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<CompaniesViewModel, object>(x=>x.CompanyName)"> <span class="company-list-th">Name</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.KeyContact)"><span class="company-list-th">Contact</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.KeyContactRole)"><span class="company-list-th">Contact Position</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.Address)"><span class="company-list-th">Address</span></MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<CompaniesViewModel, object>(x=>x.AddressType)"><span class="company-list-th">AddressType</span></MudTableSortLabel></MudTd>
+                <MudTh></MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+
+                <MudTd DataLabel="Name">@context.CompanyName</MudTd>
+                <MudTd DataLabel="Contact">@context.KeyContact</MudTd>
+                <MudTd DataLabel="Contact Position">@context.KeyContactRole</MudTd>
+                <MudTd DataLabel="Address">@context.Address</MudTd>
+                <MudTd DataLabel="AddressType">@context.AddressType</MudTd>
+                @if (CustomAuthenticationStateProvider.RoleType() != "Internal")
+                {
+                    <MudTd DataLabel="Edit" style="padding: 0; margin: 0;">
+                        <MudTooltip Text="Edit Company" Color="Color.Primary" Placement="Placement.Top">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCompanyDialog(@context.Id, 2))"></MudIconButton>
+                    </MudTooltip>
+                </MudTd>
+                <MudTd DataLabel="Remove" style="padding: 0; margin: 0;">
+                    <MudTooltip Text="Remove Company" Color="Color.Primary" Placement="Placement.Top">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveCompany(@context.Id))"></MudIconButton>
+                    </MudTooltip>
+                </MudTd>
+                }
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private CompaniesViewModel _selectedItem = null;
+    private IEnumerable<CompaniesViewModel> _companies = new List<CompaniesViewModel>();
+    private string _searchString = "";
+    private string authorizationCode;
+    public CompanyManagement()
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CustomAuthenticationStateProvider.IsAuthenticated())
+        {
+            NavigationManager.NavigateTo("/");
+        }
+
+        if (CustomAuthenticationStateProvider.RoleType() == "Client" || CustomAuthenticationStateProvider.RoleType() == "Agent")
+        {
+            NavigationManager.NavigateTo("/index");
+        }
+
+        await GetCompanies();
+    }
+
+    private async Task GetCompanies()
+    {
+        _companies = await CompaniesService.GetAllCompaniesAsync();
+    }
+
+    private bool FilterFuncCallBack(CompaniesViewModel company) => FilterFunc(company, _searchString);
+
+    private bool FilterFunc(CompaniesViewModel company, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if ((company?.CompanyName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((company?.KeyContact?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((company?.KeyContactRole?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((company?.Address?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((company?.AddressType?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        return false;
+    }
+
+    private async Task OpenManageCompanyDialog(Guid? Id,int companytype)
+    {
+        var parameters = new DialogParameters<ManageCompany>();
+        parameters.Add(x => x.Id, Id);
+        parameters.Add(x => x.companytype, companytype);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageCompany>("Company", parameters, options).Result;
+
+
+        if (!result.Canceled)
+        {
+            await GetCompanies();
+        }
+    }
+
+    private async Task RemoveCompany(Guid id)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this company record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await CompaniesService.DeleteCompaniesAsync(id);
+
+            await GetCompanies();
+
+            Snackbar.Add($"Successfully removed company.", Severity.Success);
+        }
+    }
+
+    // private async Task ExportCompanyDataCsv()
+    // {
+    //     _companies = await CompaniesService.GetAllCompaniesAsync();
+    //     string csvFilePath = "elvis_Company.csv";
+    //     string FilePath = await ExportToCsv(csvFilePath, _companies);
+    //     await JS.InvokeVoidAsync("downloadFile", FilePath, "elvis_Company.csv");
+    // }
+
+
+    private async Task ExportCompanyDataCsv(int tab)
+    {
+        IEnumerable<CompaniesViewModel> companiesToExport;
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            companiesToExport = _companies.Where(company => FilterFunc(company, _searchString));
+        }
+        else if (tab == 1)
+        {
+            var AllCompany = await CompaniesService.GetAllCompaniesAsync();
+            var filterCompany = AllCompany.Where(x => x.CompanyType == tab).ToList();
+            companiesToExport = filterCompany;
+        }
+        else if (tab == 2)
+        {
+          var AllCompany = await CompaniesService.GetAllCompaniesAsync();
+            var filterCompany = AllCompany.Where(x => x.CompanyType == tab).ToList();
+            companiesToExport = filterCompany;
+        }
+        else if (tab == 3)
+        {
+         var AllCompany = await CompaniesService.GetAllCompaniesAsync();
+            var filterCompany = AllCompany.Where(x => x.CompanyType == tab).ToList();
+            companiesToExport = filterCompany;
+        }
+        else
+        {
+            companiesToExport = _companies;
+        }
+        string csvFilePath = "elvis_Company.csv";
+        string FilePath = await ExportToCsv(csvFilePath, companiesToExport);
+        await JS.InvokeVoidAsync("downloadFile", FilePath, "elvis_Company.csv");
+    }
+
+    private async Task<string> ExportToCsv(string filePath, IEnumerable<CompaniesViewModel> companiesView)
+    {
+        DataTable dataTable = new DataTable();
+        dataTable.Columns.Add("CompanyName", typeof(string));
+        dataTable.Columns.Add("Key_Contact", typeof(string));
+        dataTable.Columns.Add("Key_Contact_Role", typeof(string));
+        dataTable.Columns.Add("Address", typeof(string));
+        dataTable.Columns.Add("AddressType", typeof(string));
+
+
+        foreach (var company in companiesView)
+        {
+            string escapedAddress = EscapeCsvField(company.Address);
+            dataTable.Rows.Add(
+                company.CompanyName,
+                company.KeyContact,
+                company.KeyContactRole,
+                escapedAddress,
+                // company.Email,
+                // company.InvoiceEmail,
+                // company.CompanyType == 1 ? "Agent" : (company.CompanyType == 2 ? "Client" :"Admin"),
+                company.AddressType
+               // company.CountryName
+               );
+        }
+        return DataTableToString(dataTable);
+    }
+
+
+    private string EscapeCsvField(string field)
+    {
+        if (field.Contains(","))
+        {
+            field = field.Replace("\"", "\"\"");
+            field = $"\"{field}\"";
+        }
+        return field;
+    }
+
+    private string DataTableToString(DataTable dataTable)
+    {
+        StringBuilder sb = new StringBuilder();
+        foreach (DataColumn column in dataTable.Columns)
+        {
+            sb.Append(column.ColumnName);
+            sb.Append(",");
+        }
+        sb.AppendLine();
+        foreach (DataRow row in dataTable.Rows)
+        {
+            foreach (var item in row.ItemArray)
+            {
+                sb.Append(item);
+                sb.Append(",");
+            }
+            sb.AppendLine();
+        }
+        return sb.ToString();
+    }
+}

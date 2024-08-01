@@ -1,0 +1,891 @@
+﻿@page "/profile"
+
+@using CMS.DL.Model;
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Companies;
+@using CaseManagementSystem.Data.Documents;
+@using CaseManagementSystem.Data.Enum;
+@using CaseManagementSystem.Data.Users;
+@using System.ComponentModel.DataAnnotations;
+@using System.Text;
+@using System.Text.RegularExpressions;
+@using CaseManagementSystem.Data.UsersDocuments;
+@using CaseManagementSystem.Data.Users;
+
+@inject UsersService UsersService
+@inject CompaniesService CompaniesService
+@inject CountryService CountryService
+@inject UserDocumentsService UserDocumentsService
+@inject ISnackbar Snackbar
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject IDialogService Dialog
+
+<style>
+    .mud-button-filled.mud-button-filled-primary {
+        background-color: #774991 !important;
+    }
+
+        .mud-button-filled.mud-button-filled-primary:hover, .mud-button-filled.mud-button-filled-primary:focus-visible {
+            background-color: #995FBA !important;
+        }
+
+</style>
+
+<PageTitle>User Profile</PageTitle>
+<MudContainer>
+    <MudCard>
+        <MudText Typo="Typo.h5" Class="mb-2"> <b>Profile</b></MudText>
+        <MudForm @ref="_form" @bind-IsValid="@_success">
+            <MudCardContent>
+                <MudGrid Spacing="2">
+                    <!--
+                                    <MudItem xs="3">
+                                        <MudTextField T="string" @bind-Value="_currentLoginUser.UserName" Label="Username" Variant="Variant.Outlined" Validation="UserNameCheck" Required="true" RequiredError="Username is required!"></MudTextField>
+                                    </MudItem>
+                    -->
+                    @*  <MudItem xs="6">
+                    <MudTextField T="string" @bind-Value="_currentLoginUser.Password" Label="Password" Variant="Variant.Outlined" Disabled="true"></MudTextField>
+                    </MudItem> *@
+                    <MudItem xs="6">
+                        <MudTextField T="string" @bind-Value="_currentLoginUser.FirstName" Label="First Name" Variant="Variant.Outlined" Required="true" RequiredError="First name is required!"></MudTextField>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudTextField T="string" @bind-Value="_currentLoginUser.LastName" Label="Last Name" Variant="Variant.Outlined"></MudTextField>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudTextField T="string" @bind-Value="_currentLoginUser.EmailAddress" Label="Email Address" Variant="Variant.Outlined" Disabled="true"></MudTextField>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12">
+                                <MudGrid>
+                                    <MudItem xs="10">
+                                        <MudGooglePlacesAutocomplete T="string" @ref="_googleAddress" @bind-Value="_currentLoginUser.Address"
+                                                                     Adornment="Adornment.Start"
+                                                                     AdornmentIcon="@Icons.Material.Filled.Map"
+                                                                     ApiKey="@_googleMapsApiKey" Disabled="true" />
+                                    </MudItem>
+                                    <MudItem xs="2" class="text-right">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@((e) => OpenManageCompaniesDialog(null))" />
+                                    </MudItem>
+                                </MudGrid>
+                            </MudItem>
+                        </MudGrid>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudAutocomplete T="CompaniesViewModel" Label="Company" @bind-Value="_selectedCompany" SearchFunc="@SearchCompanies" ToStringFunc="@(e=> e==null?null : $"{e.CompanyName}")" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                        </MudAutocomplete>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudSelect T="bool" @bind-Value="_currentLoginUser.IsActive" Disabled="true" Label="Is Active" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem Value="true">Yes</MudSelectItem>
+                            <MudSelectItem Value="false">No</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">
+                                        Telephone Numbers
+                                        <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@((e) => _userTelephones.Add(new UserTelephoneViewModel()))" Class="ml-3">Add Tel No</MudButton>
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudDivider />
+                            <MudCardContent>
+                                <MudGrid>
+                                    @for (int i = 0; i < _userTelephones.Count; i++)
+                                    {
+                                        int loopIx = i;
+                                        <MudItem xs="11">
+                                            <MudTextField T="string" @bind-Value="_userTelephones[loopIx].TelephoneNumber" Label="Tel No" Variant="Variant.Outlined" Required="true" RequiredError="Telephone Number is required!"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="1">
+                                            <MudTooltip Text="Delete Tel No" Color="Color.Primary" Placement="Placement.Top">
+                                                <MudIconButton Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => _userTelephones.RemoveAt(loopIx))"></MudIconButton>
+                                            </MudTooltip>
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudDatePicker Label="Last Login" @bind-Date="_currentLoginUser.LastLogin" Disabled="true" ReadOnly="true" />
+                    </MudItem>
+                    @*   <MudItem xs="6">
+                    </MudItem> *@
+                    <MudItem xs="6">
+                    </MudItem>
+
+                    <MudItem xs="6">
+                    </MudItem>
+                    <MudItem xs="6">
+                    </MudItem>
+
+                    @*   <MudItem xs="3">
+                    <MudSelect T="string" Label="Key Contact" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                    </MudSelect>
+                    </MudItem>*@
+                    <MudItem xs="3">
+                    </MudItem>
+                    <MudItem xs="3">
+                    </MudItem>
+                    <!--
+                    <MudItem xs="3">
+                        <MudSelect T="bool" @bind-Value="_currentLoginUser.IsSiteAdmin" Label="Site Admin" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem Value="true">Yes</MudSelectItem>
+                            <MudSelectItem Value="false">No</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudSelect T="bool" @bind-Value="_currentLoginUser.IsSuperUser" Label="Super User" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem Value="true">Yes</MudSelectItem>
+                            <MudSelectItem Value="false">No</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    -->
+                    <MudItem xs="6">
+                    </MudItem>
+                    <MudItem xs="6">
+                    </MudItem>
+
+
+                    @*   <MudItem xs="3">
+                    <MudSelect T="byte?" @bind-Value="_currentLoginUser.RoleType" Label="Role" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Required="true" RequiredError="Role type is required!">
+                    @foreach (RoleType item in Enum.GetValues(typeof(RoleType)))
+                    {
+                    if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin" || item != RoleType.InternalAdmin && item != RoleType.Client)
+                    {
+                    <MudSelectItem Value="(byte?)item">@item.ToString()</MudSelectItem>
+                    }
+                    }
+                    </MudSelect>
+                    </MudItem> *@
+                </MudGrid>
+            </MudCardContent>
+        </MudForm>
+        @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin" || CustomAuthenticationStateProvider.RoleType() == "Internal")
+        {
+            <MudCardActions Style="justify-content: end;margin-right: 8px;">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_success)" OnClick="SaveUser">Save</MudButton>
+            </MudCardActions>
+        }
+    </MudCard>
+    <div style="height: 40px;"></div> <!-- Space between the cards -->
+    @if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+    {
+        <MudCard>
+            <MudText Typo="Typo.h5" Class="mb-2"> <b>Documents</b></MudText>
+            <MudForm @ref="_form" @bind-IsValid="@_success">
+                <MudCardContent>
+                    <MudGrid Spacing="2">
+
+                        <MudItem xs="6">
+                            <MudLabel>ID</MudLabel>
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="(files) => UploadDocumentFile(files, CaseManagementSystem.Data.UsersDocuments.FileTypes.ID)">
+                                <ButtonTemplate>
+                                    <MudButton FullWidth
+                                               HtmlTag="label"
+                                               Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                                               for="@context">
+                                        Choose Files
+                                    </MudButton>
+                                </ButtonTemplate>
+                                <SelectedTemplate>
+                                    @if (_newDocuments != null && _newDocuments.Count > 0)
+                                    {
+                                        @foreach (var document in _newDocuments)
+                                        {
+                                            if (document.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ID)
+                                            {
+                                                <div class="d-flex align-center">
+                                                    <MudText>@document.FilePath</MudText>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, true))"></MudIconButton>
+                                                </div>
+                                            }
+                                            <MudDivider />
+                                        }
+
+                                    }
+                                    @if (_userDocuments != null)
+                                    {
+                                        @foreach (var document in _userDocuments)
+                                        {
+                                            if (document.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ID)
+                                            {
+                                                <div class="d-flex align-center">
+                                                    <MudText>@document.FilePath</MudText>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, false))"></MudIconButton>
+                                                </div>
+                                                <MudDivider />
+                                            }
+                                        }
+
+                                    }
+                                    else if ((_documents == null || _documents.Count == 0) && (_newDocuments == null || _newDocuments.Count == 0))
+                                    {
+                                        <MudText>No Files</MudText>
+                                    }
+                                </SelectedTemplate>
+                            </MudFileUpload>
+                        </MudItem>
+
+                        <MudItem xs="6">
+                            <MudLabel>Insurance</MudLabel>
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="(files) => UploadDocumentFile(files, CaseManagementSystem.Data.UsersDocuments.FileTypes.Insurance)">
+                                <ButtonTemplate>
+                                    <MudButton FullWidth
+                                               HtmlTag="label"
+                                               Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                                               for="@context">
+                                        Choose Files
+                                    </MudButton>
+                                </ButtonTemplate>
+                                <SelectedTemplate>
+                                    @if (_newDocuments != null && _newDocuments.Count > 0)
+                                    {
+
+                                        @foreach (var document in _newDocuments)
+                                        {
+                                            if (document.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.Insurance)
+                                            {
+                                                <div class="d-flex align-center">
+                                                    <MudText>@document.FilePath</MudText>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, true))"></MudIconButton>
+                                                </div>
+                                                <MudDivider />
+                                            }
+                                        }
+                                    }
+                                    @if (_userDocuments != null)
+                                    {
+                                        @foreach (var document in _userDocuments)
+                                        {
+                                            if (document.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.Insurance)
+                                            {
+                                                <div class="d-flex align-center">
+                                                    <MudText>@document.FilePath</MudText>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, false))"></MudIconButton>
+
+                                                </div>
+                                                <MudDivider />
+                                            }
+                                        }
+
+                                    }
+                                    else if ((_documents == null || _documents.Count == 0) && (_newDocuments == null || _newDocuments.Count == 0))
+                                    {
+                                        <MudText>No Files</MudText>
+                                    }
+                                </SelectedTemplate>
+                            </MudFileUpload>
+                        </MudItem>
+
+
+                        <MudItem xs="6">
+                            <MudLabel>ICO Registration</MudLabel>
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="(files) => UploadDocumentFile(files, CaseManagementSystem.Data.UsersDocuments.FileTypes.ICO_Registration)">
+                                <ButtonTemplate>
+                                    <MudButton FullWidth
+                                               HtmlTag="label"
+                                               Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                                               for="@context">
+                                        Choose Files
+                                    </MudButton>
+                                </ButtonTemplate>
+                                <SelectedTemplate>
+                                    @if (_newDocuments != null && _newDocuments.Count > 0)
+                                    {
+
+                                        @foreach (var document in _newDocuments)
+                                        {
+                                            if (document.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ICO_Registration)
+                                            {
+                                                <div class="d-flex align-center">
+                                                    <MudText>@document.FilePath</MudText>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, true))"></MudIconButton>
+                                                </div>
+                                                <MudDivider />
+                                            }
+                                        }
+                                    }
+                                    @if (_userDocuments != null)
+                                    {
+                                        @foreach (var document in _userDocuments)
+                                        {
+                                            if (document.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ICO_Registration)
+                                            {
+                                                <div class="d-flex align-center">
+                                                    <MudText>@document.FilePath</MudText>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, false))"></MudIconButton>
+
+                                                </div>
+                                                <MudDivider />
+                                            }
+                                        }
+
+                                    }
+                                    else if ((_documents == null || _documents.Count == 0) && (_newDocuments == null || _newDocuments.Count == 0))
+                                    {
+                                        <MudText>No Files</MudText>
+                                    }
+                                </SelectedTemplate>
+                            </MudFileUpload>
+                        </MudItem>
+
+
+
+
+                        @*                             <MudItem xs="6">
+                    <MudLabel>ICO Registration</MudLabel>
+                    <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="(files) => UploadDocumentFile(files, CaseManagementSystem.Data.UsersDocuments.FileTypes.ICO_Registration)">
+                    <ButtonTemplate>
+                    <MudButton FullWidth
+                    HtmlTag="label"
+                    Variant="Variant.Filled"
+                    Color="Color.Primary"
+                    StartIcon="@Icons.Material.Filled.CloudUpload"
+                    for="@context">
+                    Choose Files
+                    </MudButton>
+                    </ButtonTemplate>
+                    <SelectedTemplate>
+                    @if (_newDocuments != null && _newDocuments.Count > 0)
+                    {
+                    @foreach (var document in _newDocuments)
+                    {
+                    if (document.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ICO_Registration)
+                    {
+                    <div class="d-flex align-center">
+                    <MudText>@document.FilePath</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, true))"></MudIconButton>
+                    </div>
+                    }
+                    <MudDivider />
+                    }
+                    }
+                    @if (_userDocuments != null)
+                    {
+                    @foreach (var document in _userDocuments)
+                    {
+                    if (document.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ICO_Registration)
+                    {
+                    <div class="d-flex align-center">
+                    <MudText>@document.FilePath</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, false))"></MudIconButton>
+                    </div>
+                    <MudDivider />
+                    }
+                    }
+
+                    }
+                    else if ((_documents == null || _documents.Count == 0) && (_newDocuments == null || _newDocuments.Count == 0))
+                    {
+                    <MudText>No Files</MudText>
+                    }
+                    </SelectedTemplate>
+                    </MudFileUpload>
+                    </MudItem> *@
+
+
+                        <MudItem xs="6">
+                            <MudLabel>DBS</MudLabel>
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="(files) => UploadDocumentFile(files, CaseManagementSystem.Data.UsersDocuments.FileTypes.DBS)">
+                                <ButtonTemplate>
+                                    <MudButton FullWidth
+                                               HtmlTag="label"
+                                               Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                                               for="@context">
+                                        Choose Files
+                                    </MudButton>
+                                </ButtonTemplate>
+                                <SelectedTemplate>
+                                    @if (_newDocuments != null && _newDocuments.Count > 0)
+                                    {
+                                        @foreach (var document in _newDocuments)
+                                        {
+                                            if (document.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.DBS)
+                                            {
+                                                <div class="d-flex align-center">
+                                                    <MudText>@document.FilePath</MudText>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, true))"></MudIconButton>
+                                                </div>
+                                            }
+                                            <MudDivider />
+                                        }
+                                    }
+                                    @if (_userDocuments != null)
+                                    {
+                                        @foreach (var document in _userDocuments)
+                                        {
+                                            if (document.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.DBS)
+                                            {
+                                                <div class="d-flex align-center">
+                                                    <MudText>@document.FilePath</MudText>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, false))"></MudIconButton>
+                                                </div>
+                                                <MudDivider />
+                                            }
+                                            <MudDivider />
+                                        }
+                                    }
+                                    else if ((_documents == null || _documents.Count == 0) && (_newDocuments == null || _newDocuments.Count == 0))
+                                    {
+                                        <MudText>No Files</MudText>
+                                    }
+                                </SelectedTemplate>
+                            </MudFileUpload>
+                        </MudItem>
+
+                    </MudGrid>
+                </MudCardContent>
+            </MudForm>
+            <MudCardActions Style="justify-content: end;margin-right: 8px;">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_success)" OnClick="SaveUser">Save</MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+    @if (CustomAuthenticationStateProvider.RoleType() == "Client")
+    {
+        <MudCard>
+            <MudText Typo="Typo.h5" Class="mb-2"> <b>Documents</b></MudText>
+            <MudForm @ref="_form" @bind-IsValid="@_success">
+                <MudCardContent>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="6">
+                            <MudLabel>ID</MudLabel>
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="(files) => UploadDocumentFile(files, CaseManagementSystem.Data.UsersDocuments.FileTypes.ID)">
+                                <ButtonTemplate>
+                                    <MudButton FullWidth
+                                               HtmlTag="label"
+                                               Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                                               for="@context">
+                                        Choose Files
+                                    </MudButton>
+                                </ButtonTemplate>
+                                <SelectedTemplate>
+                                    @if (_newDocuments != null && _newDocuments.Count > 0)
+                                    {
+                                        @foreach (var document in _newDocuments)
+                                        {
+                                            <div class="d-flex align-center">
+                                                <MudText>@document.FilePath</MudText>
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, true))"></MudIconButton>
+                                            </div>
+                                            <MudDivider />
+                                        }
+                                    }
+                                    @if (_userDocuments != null)
+                                    {
+                                        @foreach (var document in _userDocuments)
+                                        {
+                                            if (document.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ID)
+                                            {
+                                                <div class="d-flex align-center">
+                                                    <MudText>@document.FilePath</MudText>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, false))"></MudIconButton>
+                                                </div>
+                                                <MudDivider />
+                                            }
+                                        }
+                                    }
+                                    else if ((_documents == null || _documents.Count == 0) && (_newDocuments == null || _newDocuments.Count == 0))
+                                    {
+                                        <MudText>No Files</MudText>
+                                    }
+                                </SelectedTemplate>
+                            </MudFileUpload>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudForm>
+            <MudCardActions Style="justify-content: end;margin-right: 8px;">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_success)" OnClick="SaveUser">Save</MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+
+</MudContainer>
+@code {
+    private CompaniesViewModel _selectedCompany = null;
+    private MudForm _form;
+    private bool _changesMade = false;
+    private bool _success;
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+    private string _googleMapsApiKey = "AIzaSyB718DzCLjS6Qdso7x96jciNU3oaNuPExo";
+    private MudBlazor.MudGooglePlacesAutocomplete<string> _googleAddress;
+    private List<UserDocumentsViewModel> _documents = new List<UserDocumentsViewModel>();
+    private List<UserDocumentsViewModel> _newDocuments = new List<UserDocumentsViewModel>();
+    private IEnumerable<UserDocumentsViewModel> _userDocuments = new List<UserDocumentsViewModel>();
+    private List<UserTelephoneViewModel> _userTelephones = new List<UserTelephoneViewModel>();
+    private UsersViewModel _usersView = new UsersViewModel();
+
+    private DateTime Created;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+        _userTelephones = await GetUsersTelephoneNumber(_currentLoginUser.Id);
+
+        if (_currentLoginUser.CompanyId != null && _currentLoginUser.CompanyId != Guid.Empty)
+        {
+            _selectedCompany = await CompaniesService.GetCompaniesByIdAsync((Guid)_currentLoginUser.CompanyId);
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Agent" || CustomAuthenticationStateProvider.RoleType() == "Client")
+        {
+            _userDocuments = await UserDocumentsService.GetUserDocumentsByIdAsync((Guid)_currentLoginUser.Id);
+        }
+    }
+
+    public async Task<List<UserTelephoneViewModel>> GetUsersTelephoneNumber(Guid Id)
+    {
+        _userTelephones = await UsersService.GetUsersTelephoneViewModel(_currentLoginUser.Id);
+
+        return _userTelephones;
+    }
+
+    private async Task<IEnumerable<CompaniesViewModel>> SearchCompanies(string value)
+    {
+        IEnumerable<CompaniesViewModel> companiesView = await CompaniesService.GetAllCompaniesAsync();
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            companiesView = companiesView.Where(c => c.CompanyName != null && c.CompanyName.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+
+        return companiesView;
+    }
+
+    private async Task<IEnumerable<string>> SearchCountries(string value)
+    {
+        await Task.Delay(5);
+
+        IEnumerable<string> countries = CountryService.GetAllCountries();
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            countries = countries.Where(c => c != null && c.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+
+        return countries;
+    }
+
+    private async Task<IEnumerable<string>> UserNameCheck(string value)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(value))
+            errors.Add("Username is required!");
+
+        if ((value?.Length ?? 0) < 4)
+            errors.Add("Username must be at least of length 4.");
+
+        UsersViewModel userView = await UsersService.GetUsersByUserNameAsync(value, _currentLoginUser.Id);
+        if (userView != null)
+            errors.Add("Username already exist.");
+
+        userView = await UsersService.GetUsersByEmailAddressAsync(value, _currentLoginUser.Id);
+        if (userView != null)
+            errors.Add("Email already exist.");
+
+        return errors;
+    }
+    private async Task OpenManageCompaniesDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<AddCompany>();
+        parameters.Add(x => x.Id, Id);
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        DialogResult result = await Dialog.Show<AddCompany>("Address", parameters, options).Result;
+        if (!result.Canceled)
+        {
+            var updatedAddress = result.Data?.ToString();
+            if (!string.IsNullOrEmpty(updatedAddress))
+            {
+                var match = Regex.Match(updatedAddress, @"UpdatedAddress = (.+?)\s*\}");
+                if (match.Success && match.Groups.Count > 1)
+                {
+                    var extractedAddress = match.Groups[1].Value;
+                    _currentLoginUser.Address = extractedAddress;
+                }
+            }
+        }
+    }
+    private async Task UploadDocumentFile(IReadOnlyList<IBrowserFile> files, CaseManagementSystem.Data.UsersDocuments.FileTypes documentType)
+    {
+        foreach (var file in files)
+        {
+            var fileExtention = GetFileExtension(file.Name);
+            using (var stream = file.OpenReadStream())
+            {
+                var userDocument = new UserDocumentsViewModel
+                    {
+                        // Id = Guid.NewGuid(), // Generating a new GUID for the Id
+                        Created = DateTime.UtcNow,
+                        Updated = DateTime.UtcNow,
+                        CreatedBy = _currentLoginUser.Id,
+                        FileType = documentType,
+                        FilePath = file.Name,
+                        ExpiryDate = DateTime.UtcNow.AddYears(1)
+                    };
+                switch (documentType)
+                {
+                    case CaseManagementSystem.Data.UsersDocuments.FileTypes.ID:
+                        _newDocuments.Add(userDocument);
+                        break;
+                    case CaseManagementSystem.Data.UsersDocuments.FileTypes.Insurance:
+                        _newDocuments.Add(userDocument);
+                        break;
+                    case CaseManagementSystem.Data.UsersDocuments.FileTypes.ICO_Registration:
+                        _newDocuments.Add(userDocument);
+                        break;
+                    case CaseManagementSystem.Data.UsersDocuments.FileTypes.DBS:
+                        _newDocuments.Add(userDocument);
+                        break;
+                    default:
+                        throw new ArgumentException("Invalid document type.");
+                }
+            }
+        }
+    }
+    private async Task RemoveDocument(UserDocumentsViewModel document, bool isNew)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this document record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+        if (!result.Canceled)
+        {
+            if (isNew)
+            {
+                _newDocuments.Remove(document);
+            }
+            else
+            {
+                await UserDocumentsService.DeleteUserDocumentsAsync(document.Id);
+                await GetUserDocuments();
+            }
+            Snackbar.Add($"Successfully removed document.", Severity.Success);
+            if (isNew == false)
+            {
+                _userDocuments = await UserDocumentsService.GetUserDocumentsByIdAsync((Guid)_currentLoginUser.Id);
+            }
+
+        }
+
+    }
+
+    private async Task GetUserDocuments()
+    {
+        IEnumerable<UserDocumentsViewModel> documents = await UserDocumentsService.GetAllUserDocumentsAsync();
+        _userDocuments = documents.ToList();
+    }
+    public string GetFileExtension(string fileName)
+    {
+        if (!string.IsNullOrEmpty(fileName))
+        {
+            string extension = Path.GetExtension(fileName);
+            if (!string.IsNullOrEmpty(extension))
+            {
+                return extension.Substring(1);
+            }
+        }
+        return string.Empty;
+    }
+    private async Task SaveUser()
+    {
+        try
+        {
+            bool IDTypesUploaded = false;
+            bool InsuranceTypesUploaded = false;
+            bool IcoTypesUploaded = false;
+            bool DBSTypesUploaded = false;
+            _usersView.CreatedBy = _currentLoginUser.Id;
+
+            _currentLoginUser.Updated = DateTime.UtcNow;
+            _currentLoginUser.UpdatedBy = _currentLoginUser.Id;
+            _currentLoginUser.CompanyId = _selectedCompany?.Id;
+            _usersView.UserTelephones = _usersView.UserTelephones.Where(sa => sa.CreatedBy != _currentLoginUser.CreatedBy).ToList();
+            _usersView.UserTelephones.AddRange(
+
+      // Remove the telephones of the case and re-add them based on the UI actions
+      // _currentLoginUser.UserTelephones = _currentLoginUser.UserTelephones.Where(sa => sa.CreatedBy == _currentLoginUser.Id).ToList();
+      // _currentLoginUser.UserTelephones.AddRange(
+
+      _userTelephones.Select(sa =>
+                    {
+                        if (sa.UserTelephoneId == null)
+                        {
+                            // sa.CaseId = CaseId;
+                            sa.Created = DateTime.UtcNow;
+                            sa.CreatedBy = _currentLoginUser.Id;
+                        }
+                        return sa;
+                    })
+                    );
+            _usersView.TelphoneNumber = string.Join("; ", _usersView.UserTelephones.Where(a => a.TelephoneNumber.Trim() != string.Empty).Select(a => a.TelephoneNumber));
+
+
+
+            _userDocuments = await UserDocumentsService.GetUserDocumentsByIdAsync((Guid)_currentLoginUser.Id);
+            if (_userDocuments.Any())
+            {
+                foreach (var documentType in GetDistinctDocumentTypes(_userDocuments))
+                {
+                    switch (documentType)
+                    {
+                        case CaseManagementSystem.Data.UsersDocuments.FileTypes.ID:
+                            if (_userDocuments.Any(d => d.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ID)){
+                                IDTypesUploaded = true;
+                            }
+                            if (_userDocuments.Any(d => d.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ID) && _currentLoginUser.RoleType == 2)
+                            {
+                                InsuranceTypesUploaded = true;
+                                IcoTypesUploaded = true;
+                                DBSTypesUploaded = true;
+                            }
+                            break;
+                        case CaseManagementSystem.Data.UsersDocuments.FileTypes.Insurance:
+                            if (_userDocuments.Any(d => d.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.Insurance))
+                                InsuranceTypesUploaded = true;
+                            break;
+                        case CaseManagementSystem.Data.UsersDocuments.FileTypes.ICO_Registration:
+                            if (_userDocuments.Any(d => d.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ICO_Registration))
+                                IcoTypesUploaded = true;
+                            break;
+                        case CaseManagementSystem.Data.UsersDocuments.FileTypes.DBS:
+                            if (_userDocuments.Any(d => d.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.DBS))
+                                DBSTypesUploaded = true;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+            //Check if at least one file is uploaded for each document type
+            if (_newDocuments.Any() || _userDocuments.Any())
+            {
+
+                foreach (var documentType in GetDistinctDocumentTypes(_newDocuments))
+                {
+                    switch (documentType)
+                    {
+                        case CaseManagementSystem.Data.UsersDocuments.FileTypes.ID:
+                            if (_newDocuments.Any(d => d.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ID)){
+                                IDTypesUploaded = true;
+                            }
+                            if(_newDocuments.Any(d => d.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ID) && _currentLoginUser.RoleType == 2)
+                            {
+                                InsuranceTypesUploaded = true;
+                                IcoTypesUploaded = true;
+                                DBSTypesUploaded = true;
+                            }
+                            break;
+                        case CaseManagementSystem.Data.UsersDocuments.FileTypes.Insurance:
+                            if (_newDocuments.Any(d => d.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.Insurance))
+                                InsuranceTypesUploaded = true;
+                            break;
+                        case CaseManagementSystem.Data.UsersDocuments.FileTypes.ICO_Registration:
+                            if (_newDocuments.Any(d => d.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.ICO_Registration))
+                                IcoTypesUploaded = true;
+                            break;
+                        case CaseManagementSystem.Data.UsersDocuments.FileTypes.DBS:
+                            if (_newDocuments.Any(d => d.FileType == CaseManagementSystem.Data.UsersDocuments.FileTypes.DBS))
+                                DBSTypesUploaded = true;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+
+                if (!IDTypesUploaded || !InsuranceTypesUploaded || !IcoTypesUploaded || !DBSTypesUploaded)
+                {
+                    Snackbar.Add("Please upload at least one file for each document type.", Severity.Error);
+                }
+                else{
+                    foreach (UserDocumentsViewModel document in _newDocuments)
+                    {
+                        if (document.Id == Guid.Empty)
+                        {
+                            await UserDocumentsService.InsertUserDocumentsAsync(document);
+                        }
+                        else
+                        {
+                            await UserDocumentsService.UpdateUserDocumentsAsync(document);
+
+                        }
+
+                        // _newDocuments.Clear();
+                        // await GetUserDocuments();
+
+                    }
+
+                }
+
+            }
+            else if(_currentLoginUser.RoleType == 2 && !_newDocuments.Any() && !_newDocuments.Any())
+            {
+                Snackbar.Add("Please upload at least one file", Severity.Error);
+            }
+            else if (_currentLoginUser.RoleType == 3 )
+            {
+                if(!IDTypesUploaded || !InsuranceTypesUploaded || !IcoTypesUploaded || !DBSTypesUploaded)
+                {
+                    Snackbar.Add("Please upload at least one file for each document type.", Severity.Error);
+
+                }
+            }
+            if(_currentLoginUser.RoleType == 1)
+            {
+                _usersView.CreatedBy = _currentLoginUser.Id;
+
+                await UsersService.UpdateUsersAsync(_usersView);
+                Snackbar.Add("Successfully saved user information.", Severity.Success);
+                _newDocuments.Clear();
+            }
+            if(_currentLoginUser.RoleType == 2 && (_newDocuments.Any() || _userDocuments.Any()))
+            {
+                _newDocuments.Clear();
+                // await UserDocumentsService.GetUserDocumentsByIdAsync(_currentLoginUser.Id);
+                _usersView.CreatedBy = _currentLoginUser.Id;
+                await UsersService.UpdateUsersAsync(_usersView);
+                Snackbar.Add("Successfully saved user information.", Severity.Success);
+                Snackbar.Add("Details Saved Successfully.", Severity.Success);
+                await OnInitializedAsync();
+            }
+            if (_currentLoginUser.RoleType == 3 && IDTypesUploaded && InsuranceTypesUploaded && IcoTypesUploaded && DBSTypesUploaded)
+            {
+                _newDocuments.Clear();
+                // await UserDocumentsService.GetUserDocumentsByIdAsync(_currentLoginUser.Id);
+                _usersView.CreatedBy = _currentLoginUser.Id;
+                await UsersService.UpdateUsersAsync(_usersView);
+                Snackbar.Add("Successfully saved user information.", Severity.Success);
+                // Snackbar.Add("Details Saved Successfully.", Severity.Success);
+                await OnInitializedAsync();
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Error! Please try again.", Severity.Error);
+        }
+    }
+    private IEnumerable<CaseManagementSystem.Data.UsersDocuments.FileTypes> GetDistinctDocumentTypes(IEnumerable<UserDocumentsViewModel> documents)
+    {
+        return documents.Select(d => d.FileType).Distinct();
+    }
+
+}

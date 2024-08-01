@@ -1,0 +1,356 @@
+﻿@using System.Net.Http.Json
+@using CMS.DL.Model
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Cases
+@using CaseManagementSystem.Data.Documents
+@using CaseManagementSystem.Data.Enum
+@using CaseManagementSystem.Data.Subjects
+@using CaseManagementSystem.Data.TimeLimits
+@using System.Net;
+@using CaseManagementSystem.Data.Users;
+@using CaseManagementSystem.Emails
+@using CaseManagementSystem.Emails.Templates
+@using SendGrid
+@using SendGrid.Helpers.Mail
+
+@inject UsersService UsersService
+@inject DocumentService DocumentService
+@inject IEmailService EMailService;
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject IJSRuntime JSRuntime
+@inject IConfiguration configuration;
+@inject CaseService CaseService;
+<MudDivider />
+
+<MudForm @ref="_form">
+    <MudDialog>
+        <DialogContent>
+            @* @if (_loading)
+            {
+            <MudProgressLinear Indeterminate="true" Color="@Color.Info" Style="position:absolute;top:0;right:0" />
+            } *@
+            <MudPaper Elevation="0">
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        @*  <MudLabel>ID</MudLabel> *@
+                        <MudFileUpload T="IReadOnlyList<IBrowserFile>" Accept=".pdf" FilesChanged="UploadDocumentFile">
+                            <ButtonTemplate>
+                                @if (IsLoading)
+                                {
+                                    <MudOverlay Visible="true" DarkBackground="true" ZIndex="9999">
+                                        <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+                                    </MudOverlay>
+                                }
+                                <MudButton FullWidth
+                                            HtmlTag="label"
+                                            Variant="Variant.Filled"
+                                            Color="Color.Primary"
+                                            StartIcon="@Icons.Material.Filled.CloudUpload"
+                                            for="@context">
+                                     Choose Files
+                                 </MudButton>
+                             </ButtonTemplate>
+                             <SelectedTemplate>
+                                 @if (_newDocuments != null && _newDocuments.Count > 0)
+                                {
+                                    @foreach (var document in _newDocuments)
+                                    {
+                                        <div class="d-flex align-center">
+                                            <MudText>@document.FileName</MudText>
+                                            <MudIconButton Icon="@Icons.Material.Filled.CloudDownload" Color="Color.Primary" aria-label="download" Style="margin-left: 10px;" OnClick="@((e) => DownloadDocument(document))"></MudIconButton>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, true))"></MudIconButton>
+                                        </div>
+                                        <MudDivider />
+                                    }
+                                }
+
+                                @if (_documents != null && _documents.Count > 0)
+                                {
+                                    @foreach (var document in _documents)
+                                    {
+                                        <div class="d-flex align-center">
+                                            <MudText>@document.FileName</MudText>
+                                            <MudIconButton Icon="@Icons.Material.Filled.CloudDownload" Color="Color.Primary" aria-label="download" Style="margin-left: 10px;" OnClick="@((e) => DownloadDocument(document))"></MudIconButton>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, false))"></MudIconButton>
+                                        </div>
+                                        <MudDivider />
+                                    }
+                                }
+
+                                @if ((_documents == null || _documents.Count == 0) && (_newDocuments == null || _newDocuments.Count == 0))
+                                {
+                                    <MudText>No Files</MudText>
+                                }
+                            </SelectedTemplate>
+                        </MudFileUpload>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Filled">Cancel</MudButton>
+            @if (_documents.Count > 0 || _newDocuments.Count > 0)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SendEmailToClient">Submit to Client</MudButton>
+            }
+
+        </DialogActions>
+    </MudDialog>
+</MudForm>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public string? Email { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+    [Parameter] public Guid? SubjectId { get; set; }
+
+    private TimeLimitViewModel _timeLimitView = new TimeLimitViewModel();
+    private MudForm _form;
+    private bool _loading = true;
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+    private List<DocumentViewModel> _newDocuments = new List<DocumentViewModel>();
+    private List<DocumentViewModel> _documents = new List<DocumentViewModel>();
+    private SubjectViewModel _subjectsView = new SubjectViewModel();
+    IReadOnlyList<IBrowserFile> selectedFiles;
+    private bool IsLoading { get; set; }
+    protected override async Task OnInitializedAsync()
+    {
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+        _loading = false;
+    }
+
+    public string GetFileExtension(string fileName)
+    {
+        if (!string.IsNullOrEmpty(fileName))
+        {
+            string extension = Path.GetExtension(fileName);
+            if (!string.IsNullOrEmpty(extension))
+            {
+                return extension.Substring(1);
+            }
+        }
+        return string.Empty;
+    }
+    private async Task RemoveDocument(DocumentViewModel document, bool isNew)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this document record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            if (isNew)
+            {
+                _newDocuments.Remove(document);
+            }
+            else
+            {
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "UploadedDocument", document.FileName);
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+                await DocumentService.DeleteDocumentsAsync(document.Id);
+                await GetDocumentsByCaseId();
+            }
+
+            Snackbar.Add($"Successfully removed document.", Severity.Success);
+        }
+    }
+    private async Task DownloadDocument(DocumentViewModel document)
+    {
+        try
+        {
+            if (document.Data != null && document.Data.Length > 0)
+            {
+                await JSRuntime.InvokeVoidAsync("downloadFile", document.Data, document.FileName);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add($"Error! Please try again.", Severity.Error);
+        }
+    }
+    private async Task GetDocumentsByCaseId()
+    {
+        IEnumerable<DocumentViewModel> documents = await DocumentService.GetDocumentsByCaseIdAsync((Guid)Id);
+        _documents = documents.ToList();
+    }
+
+    private async Task UploadDocumentFile(IReadOnlyList<IBrowserFile> files)
+    {
+        foreach (var file in files)
+        {
+            var fileExtension = GetFileExtension(file.Name);
+            if (fileExtension == "pdf")
+            {
+                try
+                {
+                    if (file.Size > 100 * 1024 * 1024) // 30 MB in bytes
+                    {
+                        Snackbar.Add($"File {file.Name} exceeds the maximum allowed size of 100 MB.", Severity.Error);
+                        return;
+                    }
+                    IsLoading = true;
+                    var document = new DocumentViewModel();
+                    using (var stream = file.OpenReadStream(104857600))
+                    {
+                        using (var memoryStream = new MemoryStream())
+                        {
+                            await stream.CopyToAsync(memoryStream);
+                            document.Data = memoryStream.ToArray();
+                        }
+                    }
+
+                    document.Updated = DateTime.UtcNow;
+                    document.UpdatedBy = _currentLoginUser.Id;
+                    document.Created = DateTime.UtcNow;
+                    document.CreatedBy = _currentLoginUser.Id;
+                    document.FileName = file.Name;
+                    document.Size = file.Size;
+                    document.DataContentType = file.ContentType;
+                    _newDocuments.Add(document);
+
+                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "UploadedDocument");
+                    var filePath = Path.Combine(uploadsFolder, file.Name);
+
+                    // Write the file to disk
+                    await using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+                    {
+                        await fileStream.WriteAsync(document.Data, 0, document.Data.Length);
+                    }
+                    IsLoading = false;
+
+                    var CaseReportId = Guid.NewGuid();
+                    CaseService.SaveCaseReportFile(CaseReportId , Id, SubjectId, document.FileName);
+
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Error uploading {file.Name}: {ex.Message}", Severity.Error);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Please upload a file of type .pdf", Severity.Error);
+                return;
+            }
+        }
+    }
+
+
+
+    private async Task<bool> SendEmailToClient()
+    {
+        try
+        {
+            CaseViewModel getCase = await CaseService.GetCasesByIdAsync(Id.Value);
+            if (getCase != null)
+            {
+                getCase.Status = (byte)CaseStatusType.CLOSED;
+                getCase.Updated = DateTime.UtcNow;
+                await CaseService.UpdateCasesAsync(getCase);
+            }
+             var caseNumber = getCase.CaseNumber;
+             var ClientName = getCase.ClientName;
+             var SubjectName = getCase.SubjectName;
+             var ClientEmail = getCase.ClientEmail;
+             var attachedDocuments = new List<DocumentViewModel>();
+            attachedDocuments.AddRange(_newDocuments);
+            attachedDocuments.AddRange(_documents);
+
+            // Initialize SendGrid client
+            string apiKey = "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";
+            var client = new SendGridClient(apiKey);
+            var from = new EmailAddress("liam.geoghegan@esarisk.com", "Admin");
+            var to = new EmailAddress(Email);
+            var templateId = "d-fbdf9413fef648129a11a31a85f46279";
+            var templateData = new
+            {
+                caseNumber,
+                ClientName,
+                SubjectName,
+                ClientEmail
+            };
+
+            // var subject = "Report";
+            // var plainTextContent = "Please find the attached case Report of your case";
+            // var htmlContent = "<strong>Please find the attached case Report of your case</strong>";
+            var msg = MailHelper.CreateSingleTemplateEmail(from, to, templateId, templateData);
+
+            // Attach documents to the email
+            foreach (var document in attachedDocuments)
+            {
+                var bytes = await GetPdfBytes(document);
+                var attachment = new Attachment
+                    {
+                        Content = Convert.ToBase64String(bytes),
+                        Filename = document.FileName,
+                        Type = "application/pdf",
+                        Disposition = "attachment",
+                        ContentId = document.FileName
+                    };
+                msg.AddAttachment(attachment);
+            }
+
+            // Send email
+            var response = await client.SendEmailAsync(msg);
+            if (response.StatusCode == HttpStatusCode.Accepted || response.StatusCode == HttpStatusCode.OK)
+            {
+                // DeleteFilesFromUploadsFolder(attachedDocuments.Select(d => d.FileName).ToList());
+                Cancel();
+                return true;
+            }
+            else
+            {
+                Console.WriteLine($"Failed to send email. Status code: {response.StatusCode}");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred: {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task<byte[]> GetPdfBytes(DocumentViewModel document)
+    {
+        return document.Data;
+    }
+
+    private void DeleteFilesFromUploadsFolder(List<string> fileNames)
+    {
+        try
+        {
+            string uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "UploadedDocument");
+
+            foreach (var fileName in fileNames)
+            {
+                string filePath = Path.Combine(uploadsFolder, fileName);
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                    Console.WriteLine($"File '{fileName}' deleted successfully.");
+                }
+                else
+                {
+                    Console.WriteLine($"File '{fileName}' does not exist.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred while deleting files: {ex.Message}");
+        }
+    }
+    void Cancel() => MudDialog.Cancel();
+
+}

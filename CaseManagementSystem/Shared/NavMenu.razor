@@ -1,0 +1,142 @@
+﻿@using CaseManagementSystem.Data.Auth;
+
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+
+
+<style>
+    .mud-drawer {
+        background-color: #1C3144;
+        color: rgba(255,255,255,0.6);
+    }
+
+    .mud-navmenu.mud-navmenu-default .mud-nav-link.active:not(.mud-nav-link-disabled){
+        color: #fff !important
+    }
+
+    .mud-nav-link:hover:not(.mud-nav-link-disabled){
+        color : #fff ;
+    }
+
+    .mud-navmenu.mud-navmenu-default .mud-nav-link-expand-icon.mud-transform{
+        fill : #fff !important;
+    }
+
+</style>
+
+<MudNavMenu>
+    <MudNavLink Match="NavLinkMatch.All" Href="index">
+        Home
+    </MudNavLink>
+    @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+    {
+        <MudNavLink Match="NavLinkMatch.All" Href="companymanagement">
+            Company
+        </MudNavLink>
+    }
+    @if (CustomAuthenticationStateProvider.RoleType() != "Client" && CustomAuthenticationStateProvider.RoleType() != "Agent" && CustomAuthenticationStateProvider.RoleType() != "InternalAdmin")
+    {
+        <MudNavLink Match="NavLinkMatch.All" Href="companymanagement">
+            Company
+        </MudNavLink>
+    }
+    @if (CustomAuthenticationStateProvider.RoleType() != "Agent" && CustomAuthenticationStateProvider.RoleType() != "Internal")
+    {
+        <MudNavLink Match="NavLinkMatch.All" Href="cases">
+            Cases
+        </MudNavLink>
+    }
+    @if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+    {
+        <MudNavLink Match="NavLinkMatch.All" Href="agentcase">
+            Cases
+        </MudNavLink>
+    }
+
+    @if ( CustomAuthenticationStateProvider.RoleType() == "Internal")
+    {
+        <MudNavLink Match="NavLinkMatch.All" Href="agentcase">
+            Cases
+        </MudNavLink>
+    }
+    @if (CustomAuthenticationStateProvider.RoleType() != "Agent" && CustomAuthenticationStateProvider.RoleType() != "Client")
+    {
+        <MudNavLink Match="NavLinkMatch.All" Href="usermanagement">
+            Users
+        </MudNavLink>
+    }
+    @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+    {
+        <MudNavGroup Title="Master Data" Expanded="true">
+            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="rolemanagement">
+                    Role Management
+                </MudNavLink>
+            }
+
+            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="agencytype">
+                    Agency Type
+                </MudNavLink>
+            }
+            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="casetype">
+                    Case Type
+                </MudNavLink>
+            }
+
+            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="caseprofile">
+                    Case Profile
+                </MudNavLink>
+            }
+            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="subjects">
+                    Subjects
+                </MudNavLink>
+            }
+            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="timelimit">
+                    Time Limit
+                </MudNavLink>
+            }
+            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="tracelevel">
+                    Trace Level
+                </MudNavLink>
+            }
+            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="titleprefix">
+                    Title Prefix
+                </MudNavLink>
+            }
+            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="tracereason">
+                    Trace Reason
+                </MudNavLink>
+            }
+            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="traceresult">
+                    Trace Result
+                </MudNavLink>
+            }
+
+            @if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="addresstype">
+                    Address Type
+                </MudNavLink>
+            }
+
+        </MudNavGroup>
+    }
+</MudNavMenu>

@@ -1,0 +1,180 @@
+﻿@page "/agencytype"
+
+@using System.Net.Http.Json
+@using CaseManagementSystem.Data.AgencyTypes
+@using System.Net;
+@using CaseManagementSystem.Data.Auth;
+
+@inject IDialogService Dialog
+@inject AgencyTypeService AgencyTypeService
+@inject ISnackbar Snackbar
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<style>
+    .form-control .mud-input-control {
+        display: block;
+        width: 100%;
+        padding: 0.3rem 1rem;
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #5c6479;
+        appearance: none;
+        background-color: #5c64791f;
+        background-clip: padding-box;
+        border: 1px solid #5c647936;
+        border-radius: 0.475rem;
+        box-shadow: false;
+        transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    }
+
+    .mud-input-control > .mud-input-control-input-container > div.mud-input.mud-input-text {
+        margin-top: 0px;
+    }
+
+    .mud-input.mud-input-underline:before {
+        border-bottom: 0px
+    }
+
+    .mud-table-cell {
+        font-size: 12px;
+    }
+
+    .mud-table-root {
+        padding-top: 8px;
+    }
+
+    .mud-button-filled.mud-button-filled-primary {
+        background-color: #774991 !important;
+    }
+
+        .mud-button-filled.mud-button-filled-primary:hover, .mud-button-filled.mud-button-filled-primary:focus-visible {
+            background-color: #995FBA !important;
+        }
+
+    .mud-primary-text {
+        color: #774991 !important;
+    }
+</style>
+
+<PageTitle>Agency Type</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-2"><b>Agency Type</b></MudText>
+
+
+<MudTable Items="@_agencyTypes" Hover="true" Filter="new Func<AgencyTypeViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+    <ToolBarContent>
+
+        <div class="d-flex justify-space-between align-items-center flex-grow-1">
+            <div class="form-control ">
+                <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </div>
+            <div class="d-flex align-content-center justify-end mb-2 me-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OpenManageAgencyTypeDialog(null))">Create</MudButton>
+            </div>
+        </div>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTd>Name</MudTd>
+        <MudTd>Actions</MudTd>
+    </HeaderContent>
+    <RowTemplate>
+
+        <MudTd DataLabel="Name">@context.Name</MudTd>
+        <MudTd Class="d-flex">
+            <div>
+                <MudTd DataLabel="Edit" Style="padding:0; border-bottom:0">
+                    <MudTooltip Text="Edit Agency Type" Color="Color.Primary" Placement="Placement.Top">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageAgencyTypeDialog(@context.Id))"></MudIconButton>
+                    </MudTooltip>
+                </MudTd>
+            </div>
+            <div>
+                <MudTd DataLabel="Remove" Style="padding:0; border-bottom:0">
+                    <MudTooltip Text="Remove Agency Type" Color="Color.Primary" Placement="Placement.Top">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveAgencyType(@context.Id))"></MudIconButton>
+                    </MudTooltip>
+                </MudTd>
+            </div>
+
+
+        </MudTd>
+
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private AgencyTypeViewModel _selectedItem = null;
+    private IEnumerable<AgencyTypeViewModel> _agencyTypes = new List<AgencyTypeViewModel>();
+    private string _searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CustomAuthenticationStateProvider.IsAuthenticated())
+        {
+            NavigationManager.NavigateTo("/");
+        }
+
+        if (CustomAuthenticationStateProvider.RoleType() == "Client" || CustomAuthenticationStateProvider.RoleType() == "Agent")
+        {
+            NavigationManager.NavigateTo("/index");
+        }
+
+        await GetAgencyTypes();
+    }
+
+    private async Task GetAgencyTypes()
+    {
+        _agencyTypes = await AgencyTypeService.GetAllAgencyTypesAsync();
+    }
+
+    private bool FilterFuncCallBack(AgencyTypeViewModel agencyType) => FilterFunc(agencyType, _searchString);
+
+    private bool FilterFunc(AgencyTypeViewModel agencyType, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if ((agencyType?.Name?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+
+        return false;
+    }
+
+    private async Task OpenManageAgencyTypeDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<ManageAgencyType>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageAgencyType>("Agency Type", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetAgencyTypes();
+        }
+    }
+
+    private async Task RemoveAgencyType(Guid id)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this agency type record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await AgencyTypeService.DeleteAgencyTypesAsync(id);
+            await GetAgencyTypes();
+
+            Snackbar.Add($"Successfully removed agency type.", Severity.Success);
+        }
+    }
+}

@@ -1,0 +1,1428 @@
+﻿@using CMS.DL.DM;
+@using CMS.DL.Model;
+@using CaseManagementSystem.Data.AddressType
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Companies;
+@using CaseManagementSystem.Data.CompaniesAddress;
+@using CaseManagementSystem.Data.Country;
+@using CaseManagementSystem.Data.Enum;
+@using CaseManagementSystem.Data.Users;
+@using System.ComponentModel.DataAnnotations;
+@using System.Text;
+@using System.Text.RegularExpressions;
+@using CaseManagementSystem.Emails
+@using CaseManagementSystem.Emails.Templates
+@using CaseManagementSystem.Data.Cases;
+
+@inject UsersService UsersService
+@inject CompaniesService CompaniesService
+@inject CompaniesAddressService CompaniesAddressService
+@inject CountryService CountryService
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject IGooglePlacesService _googlePlacesService
+@inject IJSRuntime JS;
+@inject CountryService country;
+@inject IEmailService EMailService;
+@inject IConfiguration configuration;
+@inject AddressService addressService
+@inject AddressTypeService AddressTypeService
+@inject HttpClient HttpClient
+@inject CaseService CaseService;
+<MudDivider />
+@if (View == true)
+{
+    <MudForm @ref="_form" ReadOnly>
+
+        <MudDialog>
+            <DialogContent>
+                @if (_loading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="@Color.Info" Style="position:absolute;top:0;right:0" />
+                }
+                <MudPaper Elevation="0">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="_companiesView.CompanyName" Label="Company Name" Variant="Variant.Outlined" Required="true" RequiredError="Company name is required!"></MudTextField>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="_companiesView.Email" Label="Email" Required="true" RequiredError="Email is required!" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="_companiesView.KeyContact" Label="Key Contact" Variant="Variant.Outlined" Required="true" RequiredError="Key contact is required!"></MudTextField>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="_companiesView.InvoiceEmail" Label="Accounts Email" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="_companiesView.KeyContactRole" Label="Key Contact Role" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem>
+
+                        <MudItem xs="6">
+                            <MudSelect T="byte?" @bind-Value="_companiesView.CompanyType" Label="Company Type" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Required="true" RequiredError="Company type is required!">
+                                @foreach (CompanyType item in Enum.GetValues(typeof(CompanyType)))
+                                {
+                                    <MudSelectItem Value="(byte?)item">@item.ToString()</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="6">
+                            <MudSelect T="string" @bind-Value="_companiesView.CountryName" Label="Country Name" Variant="Variant.Outlined">
+                                @foreach (string Countries in GetAllCountries())
+                                {
+                                    <MudSelectItem Value="Countries">@Countries</MudSelectItem>
+                                }
+                            </MudSelect>
+
+                        </MudItem>
+
+                        @if (_companiesView.CountryName != "United Kingdom")
+                        {
+                            <MudItem xs="6">
+                                @* Ensure _googleAddress is initialized before using it *@
+                                @if (_googleAddress == null)
+                                {
+                                    <div>Loading Google Address...</div>
+                                }
+                                else
+                                {
+                                    <MudGooglePlacesAutocomplete T="string" @ref="_googleAddress" @bind-Value="_companiesView.Address"
+                                                                 Adornment="Adornment.Start"
+                                                                 AdornmentIcon="@Icons.Material.Filled.Map"
+                                                                 ApiKey="@_googleMapsApiKey" Required="false" RequiredError="Address is required!" />
+                                }
+                            </MudItem>
+                        }
+
+                        <MudItem xs="4">
+
+                        </MudItem>
+
+
+
+                        <MudItem xs="6">
+
+                            @* <MudRadioGroup @bind-SelectedOption="_selectedAddressType" OnValueChanged="HandleOptionChange">
+                        <MudRadio T="string" Option="@("Home")">Home</MudRadio>
+                        <MudRadio T="string" Option="@("Office")">Office</MudRadio>
+                        <MudRadio T="string" Option="@("Other")">Other</MudRadio>
+                        </MudRadioGroup> *@
+                            @* <MudRadioGroup @bind-SelectedOption="_companiesView.AddressType" Required="true" RequiredError="Choose address type.">
+                        @foreach (var addressType in _addressTypes)
+                        {
+                        <MudRadio T="string" Option="@addressType.Name">@addressType.Name</MudRadio>
+                        }
+                        </MudRadioGroup> *@
+                            <MudTextField T="string" @bind-Value="_companiesView.AddressType" Label="Address Label" Variant="Variant.Outlined" Required="true" RequiredError="Address Label is required."></MudTextField>
+
+                        </MudItem>
+
+                        @if (_companiesView.CountryName == "United Kingdom")
+                        {
+                            <MudItem xs="4">
+                                <input type="text" style="width: 100%; border-bottom: 1px solid #ccc; height: 54px; padding-left:10px" id="addressInput" class="mud-input-root mud-input-text" @bind="_companiesView.Address"
+                                       placeholder="Type or select an address" />
+                                @if (IsLoading)
+                                {
+                                    <MudOverlay Visible="true" DarkBackground="true" ZIndex="9999">
+                                        <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+                                    </MudOverlay>
+                                }
+                                @*              @if (_companiesView.Address == null || _companiesView.Address == "")
+                        {
+                        <span style="color:red">Address is required.</span>
+                        } *@
+
+                            </MudItem>
+                            <MudItem xs="2" id="lookup-id">
+                                <MudButton id="lookup-id-2" Variant="Variant.Filled" Disabled Color="Color.Default" OnClick="HandleKeyUp" Class="ml-3">Look Up</MudButton>
+                            </MudItem>
+
+                        }
+
+                                    <MudItem xs="6">
+                                <MudTextField T="string" @bind-Value="Address1" id="Address1" placeholder="Address line 1" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+                            @if (Address2 != null)
+                            {
+                                <MudItem xs="6">
+                                    <MudTextField T="string" @bind-Value="Address2" id="Address2" placeholder="Address line 2" Variant="Variant.Outlined"></MudTextField>
+                                </MudItem>
+                            }
+                            @if (Address3 != null)
+                            {
+                                <MudItem xs="6">
+                                    <MudTextField T="string" @bind-Value="Address3" id="Address3" placeholder="Address line 3" Variant="Variant.Outlined"></MudTextField>
+                                </MudItem>
+                            }
+                            <MudItem xs="6">
+                                <MudTextField T="string" @bind-Value="Town" id="Town" placeholder="Town" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudTextField T="string" @bind-Value="PostCode" id="PostCode" placeholder="Post Code" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+
+                        <MudItem xs="6">
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Color="Color.Primary" Disabled Variant="Variant.Outlined" Size="Size.Small" Style="height: fit-content" class="py-2 mx-auto text-center" OnClick="SaveCompanyAddress">Add Address</MudButton>
+
+                        </MudItem>
+
+
+
+                        <MudTable Class="mt-2" Style="width:100%;" Items="@_companiesView.CompanyAdd">
+                            <HeaderContent>
+                                <MudTh>Address</MudTh>
+                                <MudTh>Address Type</MudTh>
+                                <MudTh>IsDefault</MudTh>
+                                <MudTh>Action</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Address" @bind-Value="_companiesAddressView.Address">@context.Address</MudTd>
+                                <MudTd DataLabel="AddressType" @bind-Value="_companiesAddressView.AddressType">@context.AddressType</MudTd>
+                                @* <MudRadioGroup @bind-SelectedOption="_selectedIsDefault" OnValueChanged="HandleOptionChanges"> *@
+                                @* <MudRadio T="string" Option="@("0")"></MudRadio> *@
+                                @* </MudRadioGroup> *@
+                                @*  <MudTd DataLabel="IsDefault">
+                            <MudCheckBox T="bool" Checked="@(_companiesAddressView == _selectedAddress)" OnValueChanged="UpdateRecord(_companiesAddressView, e)"></MudCheckBox>
+                            </MudTd> *@
+
+
+                                <MudTd DataLabel="IsDefault">
+                                    <MudCheckBox T="bool" @bind-Checked="@(context.IsDefault)" @oninput='(e) => UpdateIsDefault(e,context)'></MudCheckBox>
+                                </MudTd>
+
+                                @* <MudCheckBox T="bool" @bind-Checked="context.IsDefault" name="IsDefault" onchange="() => OnRadioValueChanged(context)" /> *@
+                                @* <MudCheckBox T="bool" @bind-Checked="_selectedIsDefault" name="IsDefault" onchange="() => OnRadioValueChanged(context)" /> *@
+
+
+                                <MudTd DataLabel="Remove">
+                                    <MudTooltip Text="Remove Company" Color="Color.Primary" Placement="Placement.Top">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" Disabled aria-label="Remove" OnClick="@((e) => RemoveCompanyAddress(@context.Id))"></MudIconButton>
+                                    </MudTooltip>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+
+                        <MudItem xs="3">
+                        </MudItem>
+                        <MudItem xs="3">
+                        </MudItem>
+                        <MudItem xs="6">
+                        </MudItem>
+                        @if (Id != null && Id != Guid.Empty)
+                        {
+                            <MudItem xs="12">
+                                <MudTable Items="@_cases" Hover="true">
+                                    <ToolBarContent>
+                                        <MudText Typo="Typo.h6">Cases</MudText>
+                                    </ToolBarContent>
+                                    <HeaderContent>
+                                        <MudTd></MudTd>
+                                        <MudTd></MudTd>
+                                        <MudTd></MudTd>
+                                        <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<CaseViewModel, object>(x=>x.CaseNumber)">Case ID </MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Created)">Date Added </MudTableSortLabel></MudTd>
+                                        @*   <MudTd>Case Type</MudTd> *@
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.TraceLevelName)">Trace Level</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.SubjectName)">Subject</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Status)">Status</MudTableSortLabel></MudTd>
+                                        @*     <MudTd>Report Sent</MudTd>
+                                <MudTd>Result</MudTd> *@
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Fee)">Fee </MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.CompanyName)">Company</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.CreatedBy)">Created By</MudTableSortLabel></MudTd>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        @if (CustomAuthenticationStateProvider.RoleType() != "Client")
+                                        {
+                                            <MudTd DataLabel="Edit" style="padding: 0; margin: 0;">
+                                                <MudTooltip Text="Edit Case" Color="Color.Primary" Placement="Placement.Top">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Disabled Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCaseDialog(@context.Id))"></MudIconButton>
+                                                </MudTooltip>
+                                            </MudTd>
+                                            <MudTd DataLabel="Remove" style="padding: 0; margin: 0;">
+                                                <MudTooltip Text="Remove Case" Color="Color.Primary" Placement="Placement.Top">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Disabled Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveCase(@context.Id))"></MudIconButton>
+                                                </MudTooltip>
+                                            </MudTd>
+                                            <MudTd DataLabel="View Subject" style="padding: 0; margin: 0;">
+                                                @if (context.SubjectId != null)
+                                                {
+                                                    <MudTooltip Text="View Subject" Color="Color.Primary" Placement="Placement.Top">
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Person" Disabled Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))"></MudIconButton>
+                                                    </MudTooltip>
+                                                }
+                                            </MudTd>
+                                        }
+                                        else
+                                        {
+                                            <MudTd>
+                                            </MudTd>
+                                            <MudTd>
+
+                                            </MudTd>
+                                            <MudTd>
+                                            </MudTd>
+                                        }
+                                        <MudTd DataLabel="Case Number">@context.CaseNumber</MudTd>
+                                        <MudTd DataLabel="Date Added">@context.Created?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                                        @*    <MudTd DataLabel="Case Type"></MudTd> *@
+                                        <MudTd DataLabel="Trace Level">@context.TraceLevelName</MudTd>
+                                        <MudTd DataLabel="Subject">@context.SubjectName</MudTd>
+                                        <MudTd DataLabel="Status">
+                                            @if ((CaseStatusType)@context.Status == CaseStatusType.REVIEW)
+                                            {
+
+                                                <MudLink @onclick="@(() => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))">@context.GetStatusName()</MudLink>
+                                            }
+                                            else
+                                            {
+                                                @context.GetStatusName()
+                                            }
+                                        </MudTd>
+                                        @*        <MudTd DataLabel="Report Sent"></MudTd>
+                                <MudTd DataLabel="Result"></MudTd> *@
+                                        <MudTd DataLabel="Fee">@context.Fee</MudTd>
+                                        <MudTd DataLabel="Company">@context.CompanyName</MudTd>
+                                        <MudTd DataLabel="Created By">@context.ClientName</MudTd>
+                                    </RowTemplate>
+                                    <PagerContent>
+                                        <MudTablePager />
+                                    </PagerContent>
+                                </MudTable>
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTable Items="@_users" Hover="true">
+                                    <ToolBarContent>
+                                        <MudText Typo="Typo.h6">Users</MudText>
+                                    </ToolBarContent>
+                                    <HeaderContent>
+                                        <MudTh></MudTh>
+                                        <MudTh></MudTh>
+                                        <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.FirstName)">Firstname</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.LastName)">Lastname</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.RoleType)">Role</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.EmailAddress)">User Email</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.CompanyName)">Company</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.LastLogin)">Last Login</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.IsActive)">Is Active</MudTableSortLabel></MudTd>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Edit">
+                                            <MudTooltip Text="Edit User" Color="Color.Primary" Placement="Placement.Top">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Disabled Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageUserDialog(@context.Id, null))"></MudIconButton>
+                                            </MudTooltip>
+                                        </MudTd>
+                                        <MudTd DataLabel="Change Password">
+                                            <MudTooltip Text="Change Password" Color="Color.Primary" Placement="Placement.Top">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Password" Disabled Color="Color.Primary" aria-label="Password" OnClick="@(() => OpenChangePasswordDialog(@context.Id))"></MudIconButton>
+                                            </MudTooltip>
+                                        </MudTd>
+                                        <MudTd DataLabel="Firstname">@context.FirstName</MudTd>
+                                        <MudTd DataLabel="Lastname">@context.LastName</MudTd>
+                                        <MudTd DataLabel="Role">@context.GetRoleTypeName()</MudTd>
+                                        <MudTd DataLabel="User Email">@context.EmailAddress</MudTd>
+                                        <MudTd DataLabel="Company">
+                                            @if ((CaseManagementSystem.Data.Enum.RoleType)(context.RoleType ?? 0) == CaseManagementSystem.Data.Enum.RoleType.Agent)
+                                                @context.AgentCompanyName
+                                            else
+                                                @context.CompanyName
+
+
+
+
+
+
+
+
+
+
+
+                                        </MudTd>
+                                        <MudTd DataLabel="Last Login">@context.LastLogin?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                                        <MudTd DataLabel="Is Active">
+                                            <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                                        </MudTd>
+                                    </RowTemplate>
+                                    <PagerContent>
+                                        <MudTablePager />
+                                    </PagerContent>
+                                </MudTable>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudPaper>
+            </DialogContent>
+            <DialogActions>
+                <MudButton Variant="Variant.Filled" Disabled OnClick="Cancel">Cancel</MudButton>
+                <MudButton Variant="Variant.Filled" Disabled Color="Color.Primary" OnClick="SaveData">Save</MudButton>
+            </DialogActions>
+        </MudDialog>
+    </MudForm>
+}
+else
+{
+    <MudForm @ref="_form">
+
+        <MudDialog>
+            <DialogContent>
+                @if (_loading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="@Color.Info" Style="position:absolute;top:0;right:0" />
+                }
+                <MudPaper Elevation="0">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="_companiesView.CompanyName" Label="Company Name" Variant="Variant.Outlined" Required="true" RequiredError="Company name is required!"></MudTextField>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="_companiesView.Email" Label="Email" Required="true" RequiredError="Email is required!" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="_companiesView.KeyContact" Label="Key Contact" Variant="Variant.Outlined" Required="true" RequiredError="Key contact is required!"></MudTextField>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="_companiesView.InvoiceEmail" Label="Accounts Email" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="_companiesView.KeyContactRole" Label="Key Contact Role" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem>
+
+                        <MudItem xs="6">
+                            <MudSelect T="byte?" @bind-Value="_companiesView.CompanyType" Label="Company Type" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Required="true" RequiredError="Company type is required!">
+                                @foreach (CompanyType item in Enum.GetValues(typeof(CompanyType)))
+                                {
+                                    <MudSelectItem Value="(byte?)item">@item.ToString()</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="6">
+                            <MudSelect T="string" @bind-Value="_companiesView.CountryName" Label="Country Name" Variant="Variant.Outlined">
+                                @foreach (string Countries in GetAllCountries())
+                                {
+                                    <MudSelectItem Value="Countries">@Countries</MudSelectItem>
+                                }
+                            </MudSelect>
+
+                        </MudItem>
+
+                        @if (_companiesView.CountryName != "United Kingdom")
+                        {
+                            <MudItem xs="6">
+                                @* Ensure _googleAddress is initialized before using it *@
+                                @if (_googleAddress == null)
+                                {
+                                    <div>Loading Google Address...</div>
+                                }
+                                else
+                                {
+                                    <MudGooglePlacesAutocomplete T="string" @ref="_googleAddress" @bind-Value="_companiesView.Address"
+                                                                 Adornment="Adornment.Start"
+                                                                 AdornmentIcon="@Icons.Material.Filled.Map"
+                                                                 ApiKey="@_googleMapsApiKey" Required="false" RequiredError="Address is required!" />
+                                }
+                            </MudItem>
+                        }
+                        @if (_companiesView.CountryName == "United Kingdom")
+                        {
+                            <MudItem xs="4">
+                                <MudSwitch @bind-Checked="@IsLookupAddress" Color="Color.Primary">
+                                    Enter address manually
+                                </MudSwitch>
+                            </MudItem>
+
+                        }
+
+                        <MudItem xs="6">
+                            <MudTextField T="string" @bind-Value="_companiesView.AddressType" Label="Address Label" Variant="Variant.Outlined" Required="true" RequiredError="Address Label is required."></MudTextField>
+
+                        </MudItem>
+
+                        @if (_companiesView.CountryName == "United Kingdom" && IsLookupAddress == false)
+                        {
+                            <MudItem xs="4">
+                                <input type="text" style="width: 100%; border-bottom: 1px solid #ccc; height: 54px; padding-left:10px" id="addressInput" class="mud-input-root mud-input-text" @bind="_companiesView.Address"
+                                       placeholder="Type or select an address" />
+                                @if (IsLoading)
+                                {
+                                    <MudOverlay Visible="true" DarkBackground="true" ZIndex="9999">
+                                        <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+                                    </MudOverlay>
+                                }
+                                @*        @if (_companiesView.Address == null || _companiesView.Address == "")
+                        {
+                        <span style="color:red">Address is required.</span>
+                        } *@
+
+                            </MudItem>
+                            <MudItem xs="2">
+                                <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="HandleKeyUp" Class="ml-3">Look Up</MudButton>
+                            </MudItem>
+
+                        }
+                        else if (_companiesView.CountryName == "United Kingdom" && IsLookupAddress == true)
+                        {
+
+                            <MudItem xs="6">
+                                <MudTextField T="string" @bind-Value="Address1" id="Address1" placeholder="Address line 1" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudTextField T="string" @bind-Value="Address2" id="Address2" placeholder="Address line 2" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudTextField T="string" @bind-Value="Address3" id="Address3" placeholder="Address line 3" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudTextField T="string" @bind-Value="Town" id="Town" placeholder="Town" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudTextField T="string" @bind-Value="PostCode" id="PostCode" placeholder="Post Code" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+                        }
+                        @if (_companiesView.CountryName == "United Kingdom" )
+                        {
+                            @if(IsLookupAddress == false)
+                            {
+                                    <MudItem xs="6">
+                                <MudTextField T="string" @bind-Value="Address1" id="Address1" placeholder="Address line 1" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+                            @if (Address2 != null)
+                            {
+                                <MudItem xs="6">
+                                    <MudTextField T="string" @bind-Value="Address2" id="Address2" placeholder="Address line 2" Variant="Variant.Outlined"></MudTextField>
+                                </MudItem>
+                            }
+                            @if (Address3 != null)
+                            {
+                                <MudItem xs="6">
+                                    <MudTextField T="string" @bind-Value="Address3" id="Address3" placeholder="Address line 3" Variant="Variant.Outlined"></MudTextField>
+                                </MudItem>
+                            }
+                            <MudItem xs="6">
+                                <MudTextField T="string" @bind-Value="Town" id="Town" placeholder="Town" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudTextField T="string" @bind-Value="PostCode" id="PostCode" placeholder="Post Code" Variant="Variant.Outlined"></MudTextField>
+                            </MudItem>
+
+                            }
+                        }
+                        <MudItem xs="12" style="display:flex">
+                            <MudButton Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small" Style="height: fit-content" class="py-2 mx-auto text-center" OnClick="SaveCompanyAddress">Add Address</MudButton>
+                        </MudItem>
+                        <MudTable Class="mt-2" Style="width:100%;" Items="@_companiesView.CompanyAdd">
+                            <HeaderContent>
+                                <MudTh>Address</MudTh>
+                                <MudTh>Address Type</MudTh>
+                                <MudTh>IsDefault</MudTh>
+                                <MudTh>Action</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Address" @bind-Value="_companiesAddressView.Address">@context.Address</MudTd>
+                                <MudTd DataLabel="AddressType" @bind-Value="_companiesAddressView.AddressType">@context.AddressType</MudTd>
+                                @* <MudRadioGroup @bind-SelectedOption="_selectedIsDefault" OnValueChanged="HandleOptionChanges"> *@
+                                @* <MudRadio T="string" Option="@("0")"></MudRadio> *@
+                                @* </MudRadioGroup> *@
+                                @*  <MudTd DataLabel="IsDefault">
+                            <MudCheckBox T="bool" Checked="@(_companiesAddressView == _selectedAddress)" OnValueChanged="UpdateRecord(_companiesAddressView, e)"></MudCheckBox>
+                            </MudTd> *@
+
+
+                                <MudTd DataLabel="IsDefault">
+                                    <MudCheckBox T="bool" @bind-Checked="@(context.IsDefault)" @oninput='(e) => UpdateIsDefault(e,context)'></MudCheckBox>
+                                </MudTd>
+
+                                @* <MudCheckBox T="bool" @bind-Checked="context.IsDefault" name="IsDefault" onchange="() => OnRadioValueChanged(context)" /> *@
+                                @* <MudCheckBox T="bool" @bind-Checked="_selectedIsDefault" name="IsDefault" onchange="() => OnRadioValueChanged(context)" /> *@
+
+
+                                <MudTd DataLabel="Remove">
+                                    <MudTooltip Text="Remove Company" Color="Color.Primary" Placement="Placement.Top">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveCompanyAddress(@context.Id))"></MudIconButton>
+                                    </MudTooltip>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+
+                        <MudItem xs="3">
+                        </MudItem>
+                        <MudItem xs="3">
+                        </MudItem>
+                        <MudItem xs="6">
+                        </MudItem>
+                        @if (Id != null && Id != Guid.Empty)
+                        {
+                            <MudItem xs="12">
+                                <MudTable Items="@_cases" Hover="true">
+                                    <ToolBarContent>
+                                        <MudText Typo="Typo.h6">Cases</MudText>
+                                    </ToolBarContent>
+                                    <HeaderContent>
+                                        <MudTd></MudTd>
+                                        <MudTd></MudTd>
+                                        <MudTd></MudTd>
+                                        <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<CaseViewModel, object>(x=>x.CaseNumber)">Case ID </MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Created)">Date Added </MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.TraceLevelName)">Trace Level</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.SubjectName)">Subject</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Status)">Status</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Fee)">Fee </MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.CompanyName)">Company</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.CreatedBy)">Created By</MudTableSortLabel></MudTd>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        @if (CustomAuthenticationStateProvider.RoleType() != "Client")
+                                        {
+                                            <MudTd DataLabel="Edit" style="padding: 0; margin: 0;">
+                                                <MudTooltip Text="Edit Case" Color="Color.Primary" Placement="Placement.Top">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCaseDialog(@context.Id))"></MudIconButton>
+                                                </MudTooltip>
+                                            </MudTd>
+                                            <MudTd DataLabel="Remove" style="padding: 0; margin: 0;">
+                                                <MudTooltip Text="Remove Case" Color="Color.Primary" Placement="Placement.Top">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveCase(@context.Id))"></MudIconButton>
+                                                </MudTooltip>
+                                            </MudTd>
+                                            <MudTd DataLabel="View Subject" style="padding: 0; margin: 0;">
+                                                @if (context.SubjectId != null)
+                                                {
+                                                    <MudTooltip Text="View Subject" Color="Color.Primary" Placement="Placement.Top">
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Person" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))"></MudIconButton>
+                                                    </MudTooltip>
+                                                }
+                                            </MudTd>
+                                        }
+                                        else
+                                        {
+                                            <MudTd>
+                                            </MudTd>
+                                            <MudTd>
+
+                                            </MudTd>
+                                            <MudTd>
+                                            </MudTd>
+                                        }
+                                        <MudTd DataLabel="Case Number">@context.CaseNumber</MudTd>
+                                        <MudTd DataLabel="Date Added">@context.Created?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                                        @*    <MudTd DataLabel="Case Type"></MudTd> *@
+                                        <MudTd DataLabel="Trace Level">@context.TraceLevelName</MudTd>
+                                        <MudTd DataLabel="Subject">@context.SubjectName</MudTd>
+                                        <MudTd DataLabel="Status">
+                                            @if ((CaseStatusType)@context.Status == CaseStatusType.REVIEW)
+                                            {
+
+                                                <MudLink @onclick="@(() => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))">@context.GetStatusName()</MudLink>
+                                            }
+                                            else
+                                            {
+                                                @context.GetStatusName()
+                                            }
+                                        </MudTd>
+                                        @*        <MudTd DataLabel="Report Sent"></MudTd>
+                                <MudTd DataLabel="Result"></MudTd> *@
+                                        <MudTd DataLabel="Fee">@context.Fee</MudTd>
+                                        <MudTd DataLabel="Company">@context.CompanyName</MudTd>
+                                        <MudTd DataLabel="Created By">@context.ClientName</MudTd>
+                                    </RowTemplate>
+                                    <PagerContent>
+                                        <MudTablePager />
+                                    </PagerContent>
+                                </MudTable>
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTable Items="@_users" Hover="true">
+                                    <ToolBarContent>
+                                        <MudText Typo="Typo.h6">Users</MudText>
+                                    </ToolBarContent>
+                                    <HeaderContent>
+                                        <MudTh></MudTh>
+                                        <MudTh></MudTh>
+                                        <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.FirstName)">Firstname</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.LastName)">Lastname</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.RoleType)">Role</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.EmailAddress)">User Email</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.CompanyName)">Company</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.LastLogin)">Last Login</MudTableSortLabel></MudTd>
+                                        <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.IsActive)">Is Active</MudTableSortLabel></MudTd>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Edit">
+                                            <MudTooltip Text="Edit User" Color="Color.Primary" Placement="Placement.Top">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageUserDialog(@context.Id, null))"></MudIconButton>
+                                            </MudTooltip>
+                                        </MudTd>
+                                        <MudTd DataLabel="Change Password">
+                                            <MudTooltip Text="Change Password" Color="Color.Primary" Placement="Placement.Top">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Password" Color="Color.Primary" aria-label="Password" OnClick="@(() => OpenChangePasswordDialog(@context.Id))"></MudIconButton>
+                                            </MudTooltip>
+                                        </MudTd>
+                                        <MudTd DataLabel="Firstname">@context.FirstName</MudTd>
+                                        <MudTd DataLabel="Lastname">@context.LastName</MudTd>
+                                        <MudTd DataLabel="Role">@context.GetRoleTypeName()</MudTd>
+                                        <MudTd DataLabel="User Email">@context.EmailAddress</MudTd>
+                                        <MudTd DataLabel="Company">
+                                            @if ((CaseManagementSystem.Data.Enum.RoleType)(context.RoleType ?? 0) == CaseManagementSystem.Data.Enum.RoleType.Agent)
+                                                @context.AgentCompanyName
+                                            else
+                                                @context.CompanyName
+
+
+
+
+
+
+
+
+
+
+
+                                        </MudTd>
+                                        <MudTd DataLabel="Last Login">@context.LastLogin?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                                        <MudTd DataLabel="Is Active">
+                                            <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                                        </MudTd>
+                                    </RowTemplate>
+                                    <PagerContent>
+                                        <MudTablePager />
+                                    </PagerContent>
+                                </MudTable>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudPaper>
+            </DialogContent>
+            <DialogActions>
+                <MudButton Variant="Variant.Filled" OnClick="Cancel">Cancel</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveData">Save</MudButton>
+            </DialogActions>
+        </MudDialog>
+    </MudForm>
+}
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+    [Parameter] public int? companytype { get; set; }
+    [Parameter] public byte Agenttype { get; set; }
+    [Parameter] public Boolean? View { get; set; }
+
+    private IEnumerable<CompaniesAddressViewModel> _companiesAddress = new List<CompaniesAddressViewModel>();
+    private CompaniesViewModel _companiesView = new CompaniesViewModel();
+    private Guid _newComId { get; set; }
+    private CompaniesAddressViewModel _companiesAddressView = new CompaniesAddressViewModel();
+    private CompaniesAddressViewModel _selectedCompany = null;
+    private MudForm _form;
+    private bool _loading = true;
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+    private string _googleMapsApiKey = "AIzaSyB718DzCLjS6Qdso7x96jciNU3oaNuPExo";
+    private MudBlazor.MudGooglePlacesAutocomplete<string>? _googleAddress;
+    private string _getAddressKey = "phQiuTiB8UmDxHChlVxl-Q42028";
+    private MudBlazor.MudGooglePlacesAutocomplete<string>? _getAddress;
+    private string selectedCountry;
+    private List<TextFieldModel> textFields = new List<TextFieldModel>();
+    private IEnumerable<AddressTypeViewModel> _addressTypes = new List<AddressTypeViewModel>();
+    private string _selectedOption = "Office";
+    private string _additionalData = "";
+    private CompaniesAddressViewModel _selectedAddress;
+    string tempAddress;
+    private IEnumerable<CaseViewModel> _cases = new List<CaseViewModel>();
+    private IEnumerable<UsersViewModel> _users = new List<UsersViewModel>();
+    private bool IsLoading { get; set; }
+    public bool IsLookupAddress { get; set; } = false;
+    private string Address1;
+    private string Address2;
+    private string Address3;
+    private string Town;
+    //private string Country;
+    private string PostCode;
+
+    private async Task OpenManageUserDialog(Guid? Id, byte? RoleType)
+    {
+        var parameters = new DialogParameters<ManageUser>();
+        parameters.Add(x => x.Id, Id);
+        parameters.Add(x => x.RoleTypeValue, RoleType);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageUser>("User", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetUsers();
+        }
+    }
+    // void ToggleValue()
+    // {
+    //     IsLookupAddress = !IsLookupAddress;
+    //     JS.InvokeAsync<string>("getInputValueEmpty");
+    // }
+    private async Task OpenChangePasswordDialog(Guid Id)
+    {
+        var parameters = new DialogParameters<ManageUser>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ChangePassword>("Change Password", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetUsers();
+        }
+    }
+
+    private async Task GetUsers()
+    {
+        if (CustomAuthenticationStateProvider.RoleType() != "InternalAdmin")
+        {
+            _users = await UsersService.GetAllUsersByClientAsync(_currentLoginUser.Id);
+            _users = _users.Where(u => u.CompanyId == Id).ToList();
+        }
+        else
+        {
+            _users = await UsersService.GetAllUsersAsync();
+            _users = _users.Where(u => u.CompanyId == Id).ToList();
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+        {
+            _users = await UsersService.GetAllUsersAsync();
+            _users = _users.Where(u => u.CompanyId == Id).ToList();
+        }
+    }
+
+    private async Task ActiveUser(UsersViewModel record, bool isChecked)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to {(isChecked ? "active" : "in-active")} this record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await UsersService.ActiveUsersAsync(record.Id, isChecked, _currentLoginUser.Id);
+            await GetUsers();
+
+            Snackbar.Add($"Successfully {(isChecked ? "active" : "in-active")} user.", Severity.Success);
+        }
+    }
+
+    private async Task OpenManageCaseDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<ManageCase>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageCase>("Case", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetCases();
+        }
+    }
+
+    private async Task RemoveCase(Guid id)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this case record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await CaseService.DeleteCasesAsync(id);
+            await GetCases();
+
+            Snackbar.Add($"Successfully removed case.", Severity.Success);
+        }
+    }
+
+    private async Task OpenManageSubjectDialog(Guid? subjectId, Guid? caseId, CaseStatusType caseStatus)
+    {
+        var parameters = new DialogParameters<ManageSubjects>();
+        parameters.Add(x => x.Id, subjectId);
+        parameters.Add(x => x.CaseId, caseId);
+        parameters.Add(x => x.CaseStatus, caseStatus);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageSubjects>("Subjects", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetCases();
+        }
+    }
+
+    private void HandleOptionChange(string value)
+    {
+        // Perform actions when the selected option changes
+        Console.WriteLine($"Selected option changed to: {value}");
+    }
+    private void HandleOptionChanges(string value)
+    {
+        _selectedIsDefault = value;
+        Console.WriteLine($"Selected option changed to: {value}");
+    }
+
+    private string _selectedAddressType = "";
+    private string _selectedIsDefault = "";
+
+    private async Task GetAddressType()
+    {
+        _addressTypes = await AddressTypeService.GetAllAddressTypeAsync();
+    }
+    private bool IsDefault { get; set; }
+    private void OnRadioValueChanged(CompaniesAddress selectedRow)
+    {
+        foreach (var row in _companiesAddress)
+        {
+            row.IsDefault = false;
+        }
+
+        //selectedRow.IsDefault = true;
+        StateHasChanged();
+    }
+    private bool UpdateIsDefault(ChangeEventArgs e, CompaniesAddressViewModel defaultAddress)
+    {
+        foreach (var row in _companiesView.CompanyAdd)
+        {
+            row.IsDefault = false;
+        }
+        StateHasChanged();
+        return true;
+    }
+    private async Task<IEnumerable<string>> GetSuggestionsAsync(string value)
+    {
+        var suggestions = await addressService.GetAutocompleteSuggestions(value);
+        return suggestions.Split(',');
+    }
+
+    private async Task HandleKeyUp()
+    {
+        IsLoading = true;
+        string id = "addressInput";
+        string[] Address = { "Address1", "Address2", "Address3", "Town", "PostCode" };
+        string address = await JS.InvokeAsync<string>("getInputValueAddress", new object[] { Address });
+        await RunFunctionOnKeyUp(address);
+        await JS.InvokeVoidAsync("addFocus", new object[] { id });
+        await Task.Delay(1000);
+        IsLoading = false;
+        Console.WriteLine($"Input value on key-up: {address}");
+    }
+    private async Task RunFunctionOnKeyUp(string inputValue)
+    {
+        Console.WriteLine($"Input value on key-up: {inputValue}");
+        await InitializeGetAddressAutocomplete(inputValue);
+    }
+
+    private async Task InitializeGetAddressAutocomplete(string value)
+    {
+        await JS.InvokeVoidAsync("Country", value, "j4DD-Sgv1Uis3NtYnXW_CQ15746");
+    }
+
+    private void HandleCountrySelection(string selectedCountry)
+    {
+        Console.WriteLine("Selected Country: " + selectedCountry);
+    }
+    private bool FilterUKAddresses(string suggestion)
+    {
+        var result = suggestion.Contains("India", StringComparison.OrdinalIgnoreCase);
+        return result;
+    }
+
+
+    private async Task SaveCompanyAddress()
+    {
+        await _form.Validate();
+        if (_form.IsValid)
+        {
+
+
+            string id = _googleAddress?.InputReference?.FieldId;
+            string[] Address = { "Address1", "Address2", "Address3", "Town", "PostCode" };
+            if (_companiesView.CountryName == "United Kingdom" && IsLookupAddress == false)
+            {
+                string address = await JS.InvokeAsync<string>("getInputValueAddress", new object[] { Address });
+                _companiesAddressView.Address = address;
+            }
+            else if (IsLookupAddress == true)
+            {
+                string manualAddress = await JS.InvokeAsync<string>("getInputValueAddress", new object[] { Address });
+                _companiesAddressView.Created = DateTime.UtcNow;
+                _companiesAddressView.CreatedBy = _currentLoginUser.Id;
+                _companiesAddressView.Address = manualAddress;
+                manualAddress = string.Empty;
+                _companiesAddressView.AddressType = _companiesAddressView.AddressType;
+                CompaniesAddressViewModel addedData = await CompaniesAddressService.GetLastCompaniesAddressAsync();
+                IsLookupAddress = false;
+            }
+            else
+            {
+                _companiesAddressView.Address = _companiesView.Address;
+            }
+
+            try
+            {
+                _companiesAddressView.Updated = DateTime.UtcNow;
+                _companiesAddressView.UpdatedBy = _companiesAddressView.Id;
+                _companiesAddressView.AddressType = _companiesView.AddressType;
+                // _companiesAddressView.IsDefault = true;
+                if (Id == null || Id == Guid.Empty)
+                {
+                    await CompaniesAddressService.UpadteCompaniesAddressAsync(_companiesAddressView);
+                }
+                _companiesView.CompanyAdd.Add(new CompaniesAddressViewModel
+                    {
+                        // Address = _companiesView.Address.Contains(",") ? _companiesView.Address : _companiesAddressView.Address,
+                        Address = _companiesAddressView.Address,
+                        AddressType = _companiesAddressView.AddressType,
+                        Id = _companiesAddressView.Id,
+                        // IsDefault = _companiesAddressView.IsDefault
+
+                    });
+                if (_companiesView.CompanyAdd.Count == 1)
+                {
+                    _companiesView.CompanyAdd.First().IsDefault = true;
+                    // for (int i = 0; i < _companiesView.CompanyAdd.Count - 1; i++)
+                    // {
+                    //     _companiesView.CompanyAdd[i].IsDefault = false;
+                    // }
+                }
+                // _companiesView.CompanyAdd = _companiesAddress.ToList();
+                _companiesAddressView.AddressType = _companiesView.AddressType;
+                _companiesAddressView.Address = string.Empty;
+                _companiesView.Address = string.Empty;
+
+                Snackbar.Add("Successfully saved company information.", Severity.Success);
+            }
+            catch (Exception)
+            {
+                Snackbar.Add("Error! Please try again.", Severity.Error);
+            }
+        }
+    }
+    //changes by vb
+    private async Task SaveCompanyAddressDb()
+    {
+        await _form.Validate();
+
+        if (_form.IsValid)
+        {
+            // The address must be retrieved from the referenced input because when picking it by clicking in google places the bound value is not updated
+            string id = _googleAddress.InputReference.FieldId;
+            string[] Address = { "Address1", "Address2", "Address3", "Town", "PostCode" };
+            string address = await JS.InvokeAsync<string>("getInputValueAddress", new object[] { Address });
+            _companiesAddressView.Address = address;
+            if (_companiesAddressView.Address == string.Empty)
+            {
+                _companiesAddressView.Address = _companiesView.Address;
+            }
+            //_companiesAddressView.AddressType = _companiesAddressView.AddressType ;
+            //_companiesAddressView.IsDefault = _companiesAddressView.IsDefault ;
+
+            try
+            {
+                _companiesAddressView.Updated = DateTime.UtcNow;
+                _companiesAddressView.UpdatedBy = _companiesAddressView.Id;
+                _companiesAddressView.AddressType = _companiesView.AddressType;
+
+                if (Id != null && Id == Guid.Empty)
+                {
+                    await CompaniesAddressService.UpadteCompaniesAddressAsync(_companiesAddressView);
+                }
+                else
+                {
+                    _companiesAddressView.Id = Guid.NewGuid();
+                    _companiesAddressView.Created = DateTime.UtcNow;
+                    _companiesAddressView.CreatedBy = _currentLoginUser.Id;
+                    _companiesAddressView.Address = _companiesAddressView.Address;
+                    _companiesAddressView.AddressType = _companiesAddressView.AddressType;
+                    //_companiesAddressView.IsDefault = true;
+                    await CompaniesAddressService.InsertCompaniesAddressAsync(_companiesAddressView);//changes by vb
+                    CompaniesAddressViewModel addedData = await CompaniesAddressService.GetLastCompaniesAddressAsync();
+                    Id = addedData.Id;//changes by vb
+                }
+                _companiesAddress = _companiesAddress.Append(new CompaniesAddressViewModel
+                    {
+                        Address = _companiesAddressView.Address,
+                        AddressType = _companiesAddressView.AddressType,
+                        Id = _companiesAddressView.Id,
+                        //IsDefault = _companiesAddressView.IsDefault
+                    });
+                _companiesAddressView.AddressType = _companiesView.AddressType;
+                Snackbar.Add("Successfully saved company information.", Severity.Success);
+            }
+            catch (Exception)
+            {
+                Snackbar.Add("Error! Please try again.", Severity.Error);
+            }
+        }
+    }
+
+    public List<string> GetAllCountries()
+    {
+
+        CountryDM countryDM = new CountryDM();
+        List<string> allCountries = countryDM.GetAllCountries();
+        return countryDM.GetAllCountries(); ;
+    }
+    private async Task SaveData()
+    {
+        await SaveCompany();
+        // await SaveCompanyAddressDb();
+    }
+
+    //changes by dd
+
+    private void UpdateRecord(CompaniesAddressViewModel context, bool isChecked)
+    {
+        if (isChecked)
+        {
+            foreach (var address in _companiesAddress)
+            {
+                if (_companiesAddress != _companiesAddressView)
+                {
+                    address.IsDefault = false;
+                }
+            }
+            _selectedAddress = context;
+        }
+        else
+        {
+            _selectedAddress = null;
+        }
+        StateHasChanged();
+
+    }
+    private async Task RemoveCompanyAddress(Guid id)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this company record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+        if (!result.Canceled)
+        {
+            // Remove the company address from the list
+            _companiesView.CompanyAdd = _companiesView.CompanyAdd.Where(a => a.Id != id).ToList();
+            // Update the UI
+            StateHasChanged();
+            // Delete the company address from the database
+            await CompaniesAddressService.DeleteCompaniesAddressAsync(id);
+            Snackbar.Add($"Successfully removed company.", Severity.Success);
+        }
+    }
+
+    //changes by dd
+    private async Task GetCompaniesAddress()
+    {
+        _companiesAddress = await CompaniesAddressService.GetAllCompaniesAddressAsync();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // _companiesView.CompanyType =(byte) CompanyType.Client;
+        _companiesView.CountryName = "United Kingdom";
+        switch (companytype)
+        {
+            case 1:
+                _companiesView.CompanyType = 3;
+                break;
+            case 2:
+                _companiesView.CompanyType = 2;
+                break;
+            case 3:
+                _companiesView.CompanyType = 1;
+                break;
+            case 4:
+                _companiesView.CompanyType = 3;
+                break;
+            default:
+                _companiesView.CompanyType = 2;
+                break;
+        }
+        _googleAddress = new MudGooglePlacesAutocomplete<string>();
+        // await InitializeGetAddressAutocomplete();
+        if (Id != null && Id != Guid.Empty)
+        {
+            await GetCompanyById();
+
+            if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+            {
+                _cases = await CaseService.GetAllCasesAsync();
+                _cases = _cases.Where(c => c.CompanyId == Id).ToList();
+            }
+            else if (CustomAuthenticationStateProvider.RoleType() == "Client")
+            {
+                _cases = await CaseService.GetCasesByClientAsync(_currentLoginUser.Id);
+                _cases = _cases.Where(c => c.CompanyId == Id).ToList();
+            }
+            if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+            {
+                _cases = await CaseService.GetAllCasesAsync();
+                _cases = _cases.Where(c => c.CompanyId == Id).ToList();
+            }
+
+            if (CustomAuthenticationStateProvider.RoleType() != "InternalAdmin")
+            {
+                _users = await UsersService.GetAllUsersByClientAsync(_currentLoginUser.Id);
+                _users = _users.Where(u => u.CompanyId == Id).ToList();
+            }
+            else
+            {
+                _users = await UsersService.GetAllUsersAsync();
+                _users = _users.Where(u => u.CompanyId == Id).ToList();
+            }
+            if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+            {
+                _users = await UsersService.GetAllUsersAsync();
+                _users = _users.Where(u => u.CompanyId == Id).ToList();
+            }
+        }
+
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+        _loading = false;
+        await GetCompaniesAddress();
+        await GetAddressType();
+    }
+
+    private async Task GetCases()
+    {
+        if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+        {
+            _cases = await CaseService.GetAllCasesAsync();
+            _cases = _cases.Where(c => c.CompanyId == Id).ToList();
+        }
+        else if (CustomAuthenticationStateProvider.RoleType() == "Client")
+        {
+            // To be reviewed
+            //_cases = await CaseService.GetAllCasesAsync();
+            _cases = await CaseService.GetCasesByClientAsync(_currentLoginUser.Id);
+            _cases = _cases.Where(c => c.CompanyId == Id).ToList();
+
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+        {
+            _cases = await CaseService.GetAllCasesAsync();
+            _cases = _cases.Where(c => c.CompanyId == Id).ToList();
+        }
+    }
+
+    private async Task GetCompanyById()
+    {
+        _companiesView = await CompaniesService.GetCompaniesByIdAsync((Guid)Id);
+        string[] AddressArray = { "Address1", "Address2", "Address3", "Town", "PostCode" };
+        if (_companiesView.Address != "")
+        {
+            string[] addressParts = _companiesView.Address.Split(',');
+            if (addressParts.Length < 4)
+            {
+                string[] last_two_elements = string.Join(", ", addressParts[^2..])?.Split(',');
+                Address1 = addressParts.Length > 0 ? addressParts[0] : "";
+                Town = last_two_elements.Length > 0 ? last_two_elements[0] : "";
+                PostCode = last_two_elements.Length > 1 ? last_two_elements[1] : "";
+            }
+            else if (addressParts.Length < 5)
+            {
+                string[] last_two_elements = string.Join(", ", addressParts[^2..])?.Split(',');
+                Address1 = addressParts.Length > 0 ? addressParts[0] : "";
+                Address2 = addressParts.Length > 1 ? addressParts[1] : "";
+                Town = last_two_elements.Length > 0 ? last_two_elements[0] : "";
+                PostCode = last_two_elements.Length > 1 ? last_two_elements[1] : "";
+            }
+            else
+            {
+                string[] last_two_elements = string.Join(", ", addressParts[^2..])?.Split(',');
+                Address1 = addressParts.Length > 0 ? addressParts[0] : "";
+                Address2 = addressParts.Length > 1 ? addressParts[1] : "";
+                Address3 = addressParts.Length > 2 ? addressParts[2] : "";
+                Town = last_two_elements.Length > 0 ? last_two_elements[0] : "";
+                PostCode = last_two_elements.Length > 1 ? last_two_elements[1] : "";
+            }
+        }
+    }
+
+    private async Task<IEnumerable<string>> SearchCountries(string value)
+    {
+        await Task.Delay(5);
+        IEnumerable<string> countries = CountryService.GetAllCountries();
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            countries = countries.Where(c => c != null && c.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+        return countries;
+    }
+
+    private void DeleteAddress(CompaniesAddressViewModel address)
+    {
+        // Add logic to delete the selected address from the list or database
+        _companiesAddress = _companiesAddress.Where(a => a.Id != address.Id).ToList();
+    }
+    // private async Task SendNewCompanyEmailNotification(string companyName)
+    // {
+    //     string subject = "New Company Created";
+    //     string body = $"A new company '{companyName}' has been created.";
+
+    //     try
+    //     {
+    //         var emailService = new EmailService("admin@example.com", "from@example.com", "smtp.example.com", 587, "username", "password");
+    //         var emailTemplate = new NewCompanyEmailTemplate(subject, body);
+    //         await emailService.SendEMailNotificationToAdminAsync(emailTemplate);
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         // Handle email sending failure
+    //         Console.WriteLine($"Error sending email notification: {ex.Message}");
+    //     }
+    // }
+
+    private async Task SaveCompany()
+    {
+        try
+        {
+            await _form.Validate();
+            if (_form.IsValid)
+            {
+                // if (_companiesView.Address == null || _companiesView.Address == "")
+                // {
+                //     Snackbar.Add("Address is required.", Severity.Error);
+                // }
+                // else
+                // {
+                // }
+                for (int i = 0; i < _companiesView.CompanyAdd.Count; i++)
+                {
+                    if (_companiesView.CompanyAdd[i].IsDefault == true)
+                    {
+                        var tempAddress = _companiesView.CompanyAdd[i].Address;
+                        _companiesView.Address = tempAddress;
+                        break;
+                    }
+                }
+                try
+                {
+                    if (_companiesView.Id == Guid.Empty || _companiesView.Id == null)
+                    {
+                        _companiesView.Created = DateTime.UtcNow;
+                        _companiesView.CreatedBy = _currentLoginUser.Id;
+                        _companiesView.AddressType = _companiesView.AddressType;
+                        _companiesAddressView.Updated = DateTime.UtcNow;
+                        _companiesAddressView.UpdatedBy = _currentLoginUser.Id;
+                        _companiesAddressView.AddressType = _companiesView.AddressType;
+                        _companiesAddressView.IsDefault = _companiesAddressView.IsDefault;
+                        _companiesAddressView.CompanyId = _companiesAddressView.CompanyId;
+                        _companiesAddressView.Id = _companiesAddressView.Id;
+
+                        var id = await CompaniesService.InsertCompaniesAsync(_companiesView);
+                        _newComId = (Guid)id;
+                        var _newCompanyId = _newComId;
+                        NewCompanyTemplate uprr = new NewCompanyTemplate();
+                        await uprr.Initialize(configuration.GetValue<string>("SiteUrl"), _companiesView.CompanyName, _companiesView.Email, _companiesView.ccEmail);
+                        //await EMailService.SendEmailNotificationAsync(uprr, _companiesView.Email, _companiesView.ccEmail);
+
+                        for (int i = 0; i < _companiesView.CompanyAdd.Count(); i++)
+                        {
+                            var _address = new CompaniesAddressViewModel
+                                {
+                                    Created = DateTime.UtcNow,
+                                    CreatedBy = _currentLoginUser.Id,
+                                    Address = _companiesView.CompanyAdd[i].Address,
+                                    AddressType = _companiesView.CompanyAdd[i].AddressType,
+                                    IsDefault = _companiesView.CompanyAdd[i].IsDefault,
+                                    CompanyId = (Guid)_newCompanyId,
+                                    Id = _companiesAddressView.Id
+                                };
+                            if (_address.Id != null && _address.Id != Guid.Empty)
+                            {
+                                await CompaniesAddressService.UpadteCompaniesAddressAsync(_address);
+                            }
+                            else
+                            {
+                                await CompaniesAddressService.InsertCompaniesAddressAsync(_address);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        //_companiesView.Created = DateTime.UtcNow;
+                        //_companiesView.CreatedBy = _currentLoginUser.Id;
+                        _companiesView.Updated = DateTime.UtcNow;
+                        _companiesView.UpdatedBy = _currentLoginUser.Id;
+                        _companiesAddressView.Created = DateTime.UtcNow;
+                        _companiesAddressView.CreatedBy = _currentLoginUser.Id;
+                        _companiesAddressView.AddressType = _companiesView.AddressType;
+                        _companiesView.AddressType = _companiesAddressView.AddressType;
+                        if (_companiesAddressView.IsDefault)
+                        {
+                            _companiesView.Address = _companiesAddressView.Address;
+                            _companiesView.AddressType = _companiesAddressView.AddressType;
+                        }
+                        await CompaniesService.UpadteCompaniesAsync(_companiesView);
+                        // await CompaniesAddressService.InsertCompaniesAddressAsync(_companiesAddressView);
+                        for (int i = 0; i < _companiesView.CompanyAdd.Count(); i++)
+                        {
+                            var companyView1 = _companiesView.CompanyAdd[i];
+                            var _address1 = new CompaniesAddressViewModel
+                                {
+                                    Id = companyView1.Id,
+                                    Created = DateTime.UtcNow,
+                                    CreatedBy = _currentLoginUser.Id,
+                                    Address = _companiesView.CompanyAdd[i].Address,
+                                    AddressType = _companiesView.CompanyAdd[i].AddressType,
+                                    IsDefault = _companiesAddressView.IsDefault != false ? _companiesAddressView.IsDefault : _companiesView.CompanyAdd[i].IsDefault,
+                                    CompanyId = _companiesView.Id,
+                                };
+                            bool IsIDTrue = _address1.Id != Guid.Empty ? true : false;
+                            if (IsIDTrue)
+                            {
+                                await CompaniesAddressService.UpadteCompaniesAddressAsync(_address1);
+                            }
+                            else
+                            {
+                                await CompaniesAddressService.InsertCompaniesAddressAsync(_address1);
+                            }
+                        }
+                        CompaniesViewModel addedData = await CompaniesService.GetLastCompaniesAsync();
+                        CompaniesAddressViewModel AddedData = await CompaniesAddressService.GetLastCompaniesAddressAsync();
+                        Id = addedData.Id;
+                        Id = AddedData.Id;
+                       // Id = _newCompanyId;
+                        // await SendNewCompanyEmailNotification(_companiesView.Email);
+                        // await EmailService.SendEmailNotificationAsync(uprr, addedData.EmailAddress, addedData.ccEmail);
+                    }
+                    _companiesView.AddressType = _companiesView.AddressType;
+                    _companiesAddressView.AddressType = _companiesView.AddressType;
+                    // NewCompanyTemplate uprr = new NewCompanyTemplate(configuration.GetValue<string>("SiteUrl"), _companiesView.CompanyName);
+                    // await EMailService.SendEmailNotificationAsync(uprr, _companiesView.Email, _companiesView.ccEmail);
+                    Snackbar.Add("Successfully saved company information.", Severity.Success);
+                }
+                catch (Exception ex)
+                {
+                    throw ex;
+                }
+                MudDialog.Close(DialogResult.Ok(_newComId));
+            }
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+    }
+
+
+    void Cancel() => MudDialog.Cancel();
+}

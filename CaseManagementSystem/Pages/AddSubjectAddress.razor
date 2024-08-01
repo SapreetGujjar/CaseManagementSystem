@@ -1,0 +1,285 @@
+﻿@using CMS.DL.DM;
+@using CMS.DL.Model;
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Companies;
+@using CaseManagementSystem.Data.CompaniesAddress;
+@using CaseManagementSystem.Data.Country;
+@using CaseManagementSystem.Data.Enum;
+@using CaseManagementSystem.Data.Users;
+@using System.ComponentModel.DataAnnotations;
+@using System.Text;
+@using System.Text.RegularExpressions;
+
+@inject UsersService UsersService
+@inject CompaniesService CompaniesService
+@inject CompaniesAddressService CompaniesAddressService
+@inject CountryService CountryService
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject IGooglePlacesService _googlePlacesService
+@inject IJSRuntime JS;
+@inject CountryService country;
+
+@inject AddressService addressService
+@inject HttpClient HttpClient
+@* <h3>AddSubjectAddress</h3> *@
+<MudDivider />
+<MudForm @ref="_form">
+
+    <MudDialog>
+        <DialogContent>
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="@Color.Info" Style="position:absolute;top:0;right:0" />
+            }
+            <MudPaper Elevation="0">
+                <MudGrid Spacing="2">
+
+                    <MudItem xs="6">
+                        <MudSelect T="string" @bind-Value="_companiesView.CountryName" Label="Country Name" Variant="Variant.Outlined">
+                            @foreach (string Countries in GetAllCountries())
+                            {
+                                <MudSelectItem Value="Countries">@Countries</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                    </MudItem>
+                    @if (_companiesView.CountryName != "United Kingdom")
+                    {
+                        <MudItem xs="6">
+                            <MudGooglePlacesAutocomplete T="string" @ref="_googleAddress" @bind-Value="_companiesView.Address"
+                                                         Adornment="Adornment.Start"
+                                                         AdornmentIcon="@Icons.Material.Filled.Map"
+                                                         ApiKey="@_googleMapsApiKey" />
+                        </MudItem>
+
+                    }
+
+                    @if (_companiesView.CountryName == "United Kingdom")
+                    {
+                        <MudItem xs="4">
+                            <input style="width: 100%; border-bottom: 1px solid #ccc; height: 54px; padding-left:10px" id="addressInput" class="mud-input-root mud-input-text" @bind="_companiesView.Address"
+                                   placeholder="Type or select an address" />
+                            @if (IsLoading)
+                            {
+                                <MudOverlay Visible="true" DarkBackground="true" ZIndex="9999">
+                                    <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+                                </MudOverlay>
+                            }
+                        </MudItem>
+                        <MudItem xs="2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="HandleKeyUp" Class="ml-3">Look Up</MudButton>
+                        </MudItem>
+                    }
+                    @if (_companiesView.CountryName == "United Kingdom")
+                    {
+                        <MudItem xs="6">
+                            <MudTextField T="string" id="Address1" placeholder="Address line 1" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" id="Address2" placeholder="Address line 2" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string" id="Address3" placeholder="Address line 3" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem>
+                   @*      <MudItem xs="6">
+                            <MudTextField T="string" id="BuildingNo" placeholder="Building Number" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem> *@
+                        <MudItem xs="6">
+                            <MudTextField T="string" id="Town" placeholder="Town" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem>
+                       @*  <MudItem xs="6">
+                            <MudTextField T="string" id="Country" placeholder="Country" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem> *@
+                        <MudItem xs="6">
+                            <MudTextField T="string" id="PostCode" placeholder="Post Code" Variant="Variant.Outlined"></MudTextField>
+                        </MudItem>
+                    }
+                    <div style="margin-bottom: 200px;">
+                    </div>
+
+                    <MudItem xs="3">
+                    </MudItem>
+                    <MudItem xs="3">
+                    </MudItem>
+
+
+                    <MudItem xs="6">
+                    </MudItem>
+
+                </MudGrid>
+            </MudPaper>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Filled" OnClick="Cancel">Cancel</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSubjectAddress">Save</MudButton>
+
+
+
+        </DialogActions>
+
+    </MudDialog>
+
+
+</MudForm>
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+    private IEnumerable<CompaniesAddressViewModel> _companiesAddress = new List<CompaniesAddressViewModel>();
+    private CompaniesViewModel _companiesView = new CompaniesViewModel();
+    private CompaniesAddressViewModel _companiesAddressView = new CompaniesAddressViewModel();
+    private CompaniesAddressViewModel _selectedCompany = null;
+
+    private MudForm _form;
+    private bool _loading = true;
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+
+    private string _googleMapsApiKey = "AIzaSyB718DzCLjS6Qdso7x96jciNU3oaNuPExo";
+    private MudBlazor.MudGooglePlacesAutocomplete<string>? _googleAddress;
+    private string _getAddressKey = "phQiuTiB8UmDxHChlVxl-Q42028";
+    private MudBlazor.MudGooglePlacesAutocomplete<string> _getAddress;
+    private string selectedCountry;
+    private List<TextFieldModel> textFields = new List<TextFieldModel>();
+    private IEnumerable<CompaniesAddress> companiesAddress = new List<CompaniesAddress>();
+    private string _selectedOption = "Office";
+    private string _additionalData = "";
+    private short? _selectedGender = 1;
+    private bool IsLoading { get; set; }
+    private async Task GetCompaniesAddress()
+    {
+        _companiesAddress = await CompaniesAddressService.GetAllCompaniesAddressAsync();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // await InitializeGetAddressAutocomplete();
+        _companiesView.CountryName = "United Kingdom";
+        if (Id != null && Id != Guid.Empty)
+        {
+            await GetCompanyById();
+        }
+
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+        _loading = false;
+        await GetCompaniesAddress();
+    }
+
+
+
+    private async Task GetCompanyById()
+    {
+        _companiesView = await CompaniesService.GetCompaniesByIdAsync((Guid)Id);
+        //string addresses = _companiesView.OtherAddress;
+        //if (!string.IsNullOrEmpty(addresses))
+        //{
+        //    textFields.AddRange(addresses.Split(',').Select(address => new TextFieldModel { value = address.Trim() }));
+        //}
+
+
+    }
+
+    public List<string> GetAllCountries()
+    {
+
+        CountryDM countryDM = new CountryDM();
+        List<string> allCountries = countryDM.GetAllCountries();
+        return countryDM.GetAllCountries(); ;
+    }
+    private async Task HandleKeyUp()
+    {
+        IsLoading = true;
+        string id = "addressInput";
+        string[] Address = { "Address1", "Address2", "Address3", "Town", "PostCode" };
+        string address = await JS.InvokeAsync<string>("getInputValueAddress", new object[] { Address });
+        await RunFunctionOnKeyUp(address);
+        await JS.InvokeVoidAsync("addFocus", new object[] { id });
+        await Task.Delay(1000);
+        IsLoading = false;
+    }
+
+    private async Task RunFunctionOnKeyUp(string inputValue)
+    {
+        Console.WriteLine($"Input value on key-up: {inputValue}");
+        await InitializeGetAddressAutocomplete();
+    }
+
+    private async Task InitializeGetAddressAutocomplete()
+    {
+        await JS.InvokeVoidAsync("Country", "addressInput", "j4DD-Sgv1Uis3NtYnXW_CQ15746");
+    }
+
+    private void HandleCountrySelection(string selectedCountry)
+    {
+        Console.WriteLine("Selected Country: " + selectedCountry);
+    }
+
+    private async Task SaveSubjectAddress()
+    {
+        string otherAddress = GetCommaSepratedAddress();
+        await _form.Validate();
+
+        if (_form.IsValid)
+        {
+            string id = _googleAddress?.InputReference?.FieldId;
+            string address = "";
+            string[] Address = new string[] { " " };
+            if (_companiesView.CountryName != "United Kingdom")
+            {
+                _companiesAddressView.Address = _companiesView.Address;
+            }
+            else
+            {
+                Address = new string[] { "Address1", "Address2", "Address3", "Town", "PostCode" };
+             address = await JS.InvokeAsync<string>("getInputValueAddress", new object[] { Address });
+            _companiesAddressView.Address = address;
+            }
+
+            try
+            {
+                _companiesAddressView.Updated = DateTime.UtcNow;
+                _companiesAddressView.UpdatedBy = _companiesAddressView.Id;
+                _companiesAddressView.AddressType = _companiesView.AddressType;
+
+                if (Id == null && Id == Guid.Empty)
+                {
+                }
+                else
+                {
+                    _companiesAddressView.Id = Guid.NewGuid();
+                    _companiesAddressView.Created = DateTime.UtcNow;
+                    _companiesAddressView.CreatedBy = _currentLoginUser.Id;
+                    _companiesAddressView.Address = _companiesAddressView.Address;
+                    _companiesAddressView.AddressType = _companiesAddressView.AddressType;
+                    CompaniesAddressViewModel addedData = await CompaniesAddressService.GetLastCompaniesAddressAsync();
+                    // Id = addedData.Id;//changes by vb
+                }
+                companiesAddress = companiesAddress.Append(new CompaniesAddress
+                    {
+                        Address = _companiesAddressView.Address,
+                        AddressType = _companiesAddressView.AddressType,
+                        Id = _companiesAddressView.Id,
+                        //IsDefault = _companiesAddressView.IsDefault
+                    });
+                _companiesAddressView.AddressType = _companiesView.AddressType;
+                _currentLoginUser.Address = _companiesAddressView.Address;
+
+                // Snackbar.Add("Successfully saved company information.", Severity.Success);
+            }
+            catch (Exception)
+            {
+                Snackbar.Add("Error! Please try again.", Severity.Error);
+            }
+            MudDialog.Close(DialogResult.Ok(new { Id, UpdatedAddress = _companiesAddressView.Address }));
+
+        }
+    }
+
+    private string GetCommaSepratedAddress()
+    {
+        string address = string.Join(",", textFields.Select(x => x.value));
+        return address?.ToString();
+    }
+    void Cancel() => MudDialog.Cancel();
+
+}

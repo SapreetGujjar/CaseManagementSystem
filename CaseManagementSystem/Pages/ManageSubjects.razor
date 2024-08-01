@@ -1,0 +1,1304 @@
+﻿@using CMS.DL.Model
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Cases
+@using CaseManagementSystem.Data.Companies;
+@using CaseManagementSystem.Data.TitlePrefixes;
+@using CaseManagementSystem.Data.Enum;
+@using CaseManagementSystem.Data.Subjects;
+@using CaseManagementSystem.Data.Documents;
+@using CaseManagementSystem.Data.Users;
+@using System.ComponentModel.DataAnnotations;
+@using System.Text;
+@using System.Text.RegularExpressions;
+@using CaseManagementSystem.Emails
+@using CaseManagementSystem.Emails.Templates
+@using System.Web;
+
+@inject UsersService UsersService
+@inject CompaniesService CompaniesService
+@inject CountryService CountryService
+@inject TitlePrefixeService TitlePrefixeService
+@inject DocumentService DocumentService
+@inject SubjectService SubjectService
+@inject CaseService CaseService;
+@inject IEmailService EMailService;
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject IJSRuntime JSRuntime
+@inject IConfiguration configuration;
+
+<MudDivider />
+
+<MudForm @ref="_form">
+    <MudDialog>
+        <DialogContent>
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="@Color.Info" Style="position:absolute;top:0;right:0" />
+            }
+            <MudPaper Elevation="0">
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">Details</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudDivider />
+                            <MudCardContent>
+                                <MudItem xs="12">
+                                    <MudTextField T="string" @bind-Value="_subjectsView.FirstName" Label="First Name" Variant="Variant.Outlined" Required="true" RequiredError="Firstname is required!" ReadOnly="_isAgent"></MudTextField>
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudTextField T="string" @bind-Value="_subjectsView.MiddleName" Label="Middle Name" Variant="Variant.Outlined" ReadOnly="_isAgent"></MudTextField>
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudTextField T="string" @bind-Value="_subjectsView.LastName" Label="Last Name" Variant="Variant.Outlined" Required="true" RequiredError="Lastname is required!" ReadOnly="_isAgent"></MudTextField>
+                                </MudItem>
+                                @*
+                                <MudItem xs="12" Class="d-flex align-center">
+                                <MudAutocomplete T="CompaniesViewModel" Label="Company" @bind-Value="_selectedCompany" SearchFunc="@SearchCompanies" ToStringFunc="@(e=> e==null?null : $"{e.CompanyName}")" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                                </MudAutocomplete>
+                                <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@((e) => OpenManageCompanyDialog(null))" Class="ml-3">Add Company</MudButton>
+                                </MudItem>
+                                *@
+
+                                @*    <MudItem xs="12">
+                                <MudAutocomplete T="TitlePrefixeViewModel" Label="Title Prefix" @bind-Value="_selectedTitlePrefix" SearchFunc="@SearchTitlePrefixes" ToStringFunc="@(e=> e==null?null : $"{e.Name}")" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" ReadOnly="_isAgent">
+                                </MudAutocomplete>
+                                </MudItem> *@
+                                <MudItem xs="12">
+                                    <MudSelect T="TitlePrefixeViewModel" Label="Title Prefix" @bind-Value="_selectedtitlePrefixeName" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Disabled="_isAgent">
+                                        @foreach (var prefix in titlePrefixe)
+                                        {
+                                            <MudSelectItem T="TitlePrefixeViewModel" Value="prefix">
+                                                @prefix.Name
+                                            </MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+
+                                <MudItem xs="12">
+                                    <MudTextField T="string" @bind-Value="_subjectsView.Notes" Label="Notes" Variant="Variant.Outlined" Clearable="true" Lines="3" ReadOnly="_isAgent" />
+                                </MudItem>
+                                <MudItem xs="12" Style="margin-top: 3px; margin-bottom: 3px;">
+                                    <MudDatePicker Placeholder="Date of birth (DD.MM.YYYY)" Editable="true" @bind-Date="_subjectsView.DateOfBirth" DateFormat="dd.MM.yyyy" ReadOnly="_isAgent" />
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudFileUpload T="IReadOnlyList<IBrowserFile>" Accept=".pdf" FilesChanged="UploadDocumentFile">
+
+                                        <ButtonTemplate>
+                                            @if (IsLoading)
+                                            {
+                                                <MudOverlay Visible="true" DarkBackground="true" ZIndex="9999">
+                                                    <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+                                                </MudOverlay>
+                                            }
+                                            <MudButton FullWidth
+                                                       HtmlTag="label"
+                                                       Variant="Variant.Filled"
+                                                       Color="Color.Primary"
+                                                       StartIcon="@Icons.Material.Filled.CloudUpload"
+                                                       for="@context">
+                                                Choose Files
+                                            </MudButton>
+                                        </ButtonTemplate>
+                                        <SelectedTemplate>
+                                            @if (_newDocuments != null && _newDocuments.Count > 0)
+                                            {
+                                                @foreach (var document in _newDocuments)
+                                                {
+                                                    <div class="d-flex align-center">
+                                                        <MudText>@document.FileName</MudText>
+                                                        <MudIconButton Icon="@Icons.Material.Filled.CloudDownload" Color="Color.Primary" aria-label="download" Style="margin-left: 10px;" OnClick="@((e) => DownloadDocument(document))"></MudIconButton>
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, true))"></MudIconButton>
+                                                    </div>
+                                                    <MudDivider />
+                                                }
+                                            }
+
+                                            @if (_documents != null && _documents.Count > 0)
+                                            {
+                                                @foreach (var document in _documents)
+                                                {
+                                                    <div class="d-flex align-center">
+                                                        <MudText>@document.FileName</MudText>
+                                                        <MudIconButton Icon="@Icons.Material.Filled.CloudDownload" Color="Color.Primary" aria-label="download" Style="margin-left: 10px;" OnClick="@((e) => DownloadDocument(document))"></MudIconButton>
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="delete" OnClick="@((e) => RemoveDocument(document, false))"></MudIconButton>
+                                                    </div>
+                                                    <MudDivider />
+                                                }
+                                            }
+
+                                            @if ((_documents == null || _documents.Count == 0) && (_newDocuments == null || _newDocuments.Count == 0))
+                                            {
+                                                <MudText>No Files</MudText>
+                                            }
+                                        </SelectedTemplate>
+                                    </MudFileUpload>
+                                </MudItem>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">
+                                        Addresses
+                                        <MudButton Variant="Variant.Filled" Color="Color.Default"
+                                                   OnClick="@((e) => OpenManageSubjectDialog(null))" Class="ml-3">Add Address</MudButton>
+                                        @*
+                                        "@((e) => {_googleAddress.Add(new MudBlazor.MudGooglePlacesAutocomplete<string>()); _addresses.Add(string.Empty);})"
+                                        *@
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudDivider />
+                            <MudCardContent>
+                                <MudGrid>
+                                    @if (_isAgent)
+                                    {
+                                        <MudItem xs="12">
+                                            <MudText>@_subjectsView.Addresses</MudText>
+                                        </MudItem>
+                                    }
+                                    @*          @for (int i = 0; i < _subjectAddresses.Count; i++)
+                                    {
+                                    int loopIx = i;
+                                    <MudItem xs="10" Style=@(_isAdmin && _subjectAddresses[loopIx].CaseId != null && _subjectAddresses[loopIx].CaseId == CaseId ? "background-color: #ada8a8" : string.Empty)>
+                                    <MudGooglePlacesAutocomplete T="string" @ref="_googleAddress[loopIx]" @bind-Value="_subjectAddresses[loopIx].Address"
+                                    Adornment="Adornment.Start"
+                                    AdornmentIcon="@Icons.Material.Filled.Map"
+                                    ApiKey="@_googleMapsApiKey" ReadOnly="_isAgent" Required="true" RequiredError="Address is required!" />
+                                    </MudItem>
+                                    <MudItem xs="1" class="text-right">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@((e) => OpenManageSubjectDialog(null))" />
+                                    </MudItem>
+                                    <MudItem xs="1">
+                                    <MudTooltip Text="Delete Address" Color="Color.Primary" Placement="Placement.Top">
+                                    <MudIconButton Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Primary" aria-label="Edit"
+                                    OnClick="@((e) => RemoveAddress(loopIx))"></MudIconButton>
+
+                                    "@((e) => { _addresses.RemoveAt(loopIx); _googleAddress.RemoveAt(loopIx); })"
+
+                                    </MudTooltip>
+                                    </MudItem>
+                                    } *@
+                                    @for (int i = 0; i < _subjectAddresses.Count; i++)
+                                    {
+                                        int loopIx = i;
+                                        <MudItem xs="10" Style="@(_isAdmin && _subjectAddresses[loopIx].CaseId != null && _subjectAddresses[loopIx].CaseId == CaseId ? "background-color: #ada8a8;" : string.Empty)">
+                                            <MudGooglePlacesAutocomplete T="string" @ref="_googleAddress[loopIx]" @bind-Value="_subjectAddresses[loopIx].Address"
+                                                                         Adornment="Adornment.Start"
+                                                                         AdornmentIcon="@Icons.Material.Filled.Map"
+                                                                         ApiKey="@_googleMapsApiKey" ReadOnly="_isAgent" Required="true" RequiredError="Address is required!" />
+                                        </MudItem>
+                                        <MudItem xs="1">
+                                            <MudTooltip Text="Delete Address" Color="Color.Primary" Placement="Placement.Top">
+                                                <MudIconButton Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Primary" aria-label="Delete"
+                                                               OnClick="@(() => RemoveAddress(loopIx))"></MudIconButton>
+                                            </MudTooltip>
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">
+                                        Telephone Numbers
+                                        <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@((e) => _subjectTelephones.Add(new SubjectTelephonesViewModel()))" Class="ml-3">Add Tel No</MudButton>
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudDivider />
+                            <MudCardContent>
+                                <MudGrid>
+                                    @if (_isAgent)
+                                    {
+                                        <MudItem xs="12">
+                                            <MudText>@_subjectsView.TelephoneNumber</MudText>
+                                        </MudItem>
+                                    }
+
+                                    @for (int i = 0; i < _subjectTelephones.Count; i++)
+                                    {
+                                        int loopIx = i;
+                                        <MudItem xs="11" Style=@(_isAdmin && _subjectTelephones[loopIx].CaseId != null && _subjectTelephones[loopIx].CaseId == CaseId ? "background-color: #ada8a8" : string.Empty)>
+                                            <MudTextField ReadOnly="_isAgent" T="string" @bind-Value="_subjectTelephones[loopIx].TelephoneNumber" Label="Tel No" Variant="Variant.Outlined" Required="true" RequiredError="Telephone Number is required!"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="1">
+                                            <MudTooltip Text="Delete Tel No" Color="Color.Primary" Placement="Placement.Top">
+                                                <MudIconButton Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => _subjectTelephones.RemoveAt(loopIx))"></MudIconButton>
+                                            </MudTooltip>
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">
+                                        Alias
+                                        <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@((e) => _subjectAliases.Add(new SubjectAliasViewModel()))" Class="ml-3">Add Alias</MudButton>
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudDivider />
+                            <MudCardContent>
+                                <MudGrid>
+                                    @if (_isAgent)
+                                    {
+                                        <MudItem xs="12">
+                                            <MudText>@_subjectsView.Alias</MudText>
+                                        </MudItem>
+                                    }
+
+                                    @for (int i = 0; i < _subjectAliases.Count; i++)
+                                    {
+                                        int loopIx = i;
+                                        <MudItem xs="11" Style=@(_isAdmin && _subjectAliases[loopIx].CaseId != null && _subjectAliases[loopIx].CaseId == CaseId ? "background-color: #ada8a8" : string.Empty)>
+                                            <MudTextField ReadOnly="_isAgent" T="string" @bind-Value="_subjectAliases[loopIx].Alias" Label="Alias" Variant="Variant.Outlined" Required="true" RequiredError="Alias is required!"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="1">
+                                            <MudTooltip Text="Delete Alias" Color="Color.Primary" Placement="Placement.Top">
+                                                <MudIconButton Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => _subjectAliases.RemoveAt(loopIx))"></MudIconButton>
+                                            </MudTooltip>
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">
+                                        Emails
+                                        <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@((e) => _subjectEmails.Add(new SubjectEmailViewModel()))" Class="ml-3">Add eMail</MudButton>
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudDivider />
+                            <MudCardContent>
+                                <MudGrid>
+                                    @if (_currentLoginUser.RoleType != null && (RoleType)_currentLoginUser.RoleType == RoleType.Agent)
+                                    {
+                                        <MudItem xs="12">
+                                            <MudText>@_subjectsView.Email</MudText>
+                                        </MudItem>
+                                    }
+
+                                    @for (int i = 0; i < _subjectEmails.Count; i++)
+                                    {
+                                        int loopIx = i;
+                                        <MudItem xs="11" Style=@(_isAdmin && _subjectEmails[loopIx].CaseId != null && _subjectEmails[loopIx].CaseId == CaseId ? "background-color: #ada8a8" : string.Empty)>
+                                            <MudTextField ReadOnly="_isAgent" T="string" @bind-Value="_subjectEmails[loopIx].Email" Label="eMails" Variant="Variant.Outlined" Required="true" RequiredError="Email is required!"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="1">
+                                            <MudTooltip Text="Delete eMail" Color="Color.Primary" Placement="Placement.Top">
+                                                <MudIconButton Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => _subjectEmails.RemoveAt(loopIx))"></MudIconButton>
+                                            </MudTooltip>
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">
+                                        Companies
+                                        <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@((e) => _subjectCompanies.Add(new SubjectCompanyViewModel()))" Class="ml-3">Add Company</MudButton>
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudDivider />
+                            <MudCardContent>
+                                <MudGrid>
+                                    @if (_currentLoginUser.RoleType != null && (RoleType)_currentLoginUser.RoleType == RoleType.Agent)
+                                    {
+                                        <MudItem xs="12">
+                                            <MudText>@_subjectsView.Company</MudText>
+                                        </MudItem>
+                                    }
+
+                                    @for (int i = 0; i < _subjectCompanies.Count; i++)
+                                    {
+                                        int loopIx = i;
+                                        <MudItem xs="11" Style=@(_isAdmin && _subjectCompanies[loopIx].CaseId != null && _subjectCompanies[loopIx].CaseId == CaseId ? "background-color: #ada8a8" : string.Empty)>
+                                            <MudTextField ReadOnly="_isAgent" T="string" @bind-Value="_subjectCompanies[loopIx].Company" Label="company" Variant="Variant.Outlined" Required="true" RequiredError="Company is required!"></MudTextField>
+                                        </MudItem>
+                                        <MudItem xs="1">
+                                            <MudTooltip Text="Delete Company" Color="Color.Primary" Placement="Placement.Top">
+                                                <MudIconButton Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => _subjectCompanies.RemoveAt(loopIx))"></MudIconButton>
+                                            </MudTooltip>
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                    @if (_subjectChanges != null && _isAdmin == true)
+                    {
+                        <MudItem xs="12">
+                            <MudTable Items="@_subjectChanges" Hover="true">
+                                <ToolBarContent>
+                                    <MudText Typo="Typo.h6">Subject Case changes</MudText>
+                                </ToolBarContent>
+                                <HeaderContent>
+                                    <MudTh>Date</MudTh>
+                                    <MudTh>User</MudTh>
+                                    <MudTh>Change</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Firstname">@context.Created</MudTd>
+                                    <MudTd DataLabel="User">@context.CreatedBy</MudTd>
+                                    <MudTd DataLabel="Email">@context.Change</MudTd>
+                                </RowTemplate>
+                                <PagerContent>
+                                    <MudTablePager />
+                                </PagerContent>
+                            </MudTable>
+                        </MudItem>
+                    }
+                    @if (_subjectTraceQuestions != null && _subjectTraceQuestions.Count != 0)
+                    {
+                        <MudItem xs="12">
+                            @if (_isAgent == true)
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="RetakeQuestions" Class="ml-3">Retake questions</MudButton>
+                            }
+                            <MudTable Items="@_subjectTraceQuestions" Hover="true">
+                                <ToolBarContent>
+                                    <MudText Typo="Typo.h6">Trace Questions</MudText>
+                                </ToolBarContent>
+                                <HeaderContent>
+                                    <MudTh>Date</MudTh>
+                                    <MudTh>User</MudTh>
+                                    <MudTh>Question</MudTh>
+                                    <MudTh>Answer</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Firstname">@context.Created</MudTd>
+                                    <MudTd DataLabel="User">@context.CreatedBy</MudTd>
+                                    <MudTd DataLabel="Question">@context.Question</MudTd>
+                                    <MudTd DataLabel="Answer">@context.Answer</MudTd>
+                                </RowTemplate>
+                                <PagerContent>
+                                    <MudTablePager />
+                                </PagerContent>
+                            </MudTable>
+                        </MudItem>
+                    }
+
+                </MudGrid>
+            </MudPaper>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Filled" OnClick="Cancel">Cancel</MudButton>
+            @if (_isAdmin && CaseStatus == CaseStatusType.REVIEW)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="Reject">Reject</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Approve">Approve</MudButton>
+            }
+            else
+            {
+                // Verify it's not an Agent checking a CLOSED case
+                if ((CaseStatus == CaseStatusType.CLOSED) == false)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => SaveSubject(true))">
+                        @((_isAgent == true) ? "Submit For review" : "Save")
+                    </MudButton>
+                }
+            }
+        </DialogActions>
+    </MudDialog>
+</MudForm>
+
+
+<script suppress-error="BL9992">
+    function downloadFile(fileData, fileName) {
+        const blob = new Blob([new Uint8Array(fileData)], { type: 'application/octet-stream' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+</script>
+
+
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+    [Parameter] public string FirstName { get; set; }
+    [Parameter] public string LastName { get; set; }
+    [Parameter] public DateTime? DOB { get; set; }
+
+    [Parameter] public Guid? CaseId { get; set; }
+    [Parameter] public CaseStatusType? CaseStatus { get; set; }
+
+    private SubjectViewModel _subjectsView = new SubjectViewModel();
+    private CompaniesViewModel _selectedCompany = null;
+    private List<DocumentViewModel> _documents = new List<DocumentViewModel>();
+    private List<DocumentViewModel> _newDocuments = new List<DocumentViewModel>();
+    private TitlePrefixeViewModel _selectedTitlePrefix = null;
+    private MudForm _form;
+    private bool _loading = true;
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+
+    private List<CaseTraceQuestions> _caseTraceQuestions = new List<CaseTraceQuestions>();
+
+    private List<SubjectAliasViewModel> _subjectAliases = new List<SubjectAliasViewModel>();
+    private List<SubjectEmailViewModel> _subjectEmails = new List<SubjectEmailViewModel>();
+    private List<SubjectCompanyViewModel> _subjectCompanies = new List<SubjectCompanyViewModel>();
+
+    private List<SubjectAddressesViewModel> _subjectAddresses = new List<SubjectAddressesViewModel>();
+    private List<SubjectTelephonesViewModel> _subjectTelephones = new List<SubjectTelephonesViewModel>();
+    private List<SubjectChanges> _subjectChanges = null;
+    private List<SubjectCaseTraceQuestions> _subjectTraceQuestions = null;
+
+    private bool _isAgent = false;
+    private bool _isAdmin = false;
+
+    private string _googleMapsApiKey = "AIzaSyB718DzCLjS6Qdso7x96jciNU3oaNuPExo";
+    private List<MudBlazor.MudGooglePlacesAutocomplete<string>> _googleAddress = new List<MudBlazor.MudGooglePlacesAutocomplete<string>>();
+    private List<string> _addresses = new List<string>();
+    public List<TitlePrefixeViewModel> titlePrefixe = new List<TitlePrefixeViewModel>();
+    private TitlePrefixeViewModel _selectedtitlePrefixeName;
+    public bool _isChange = true;
+    private bool IsLoading { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _subjectsView.FirstName = FirstName;
+        _subjectsView.LastName = LastName;
+        _subjectsView.DateOfBirth = DOB;
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+        _isAdmin = (RoleType)_currentLoginUser.RoleType == RoleType.InternalAdmin;
+        _isAgent = (RoleType)_currentLoginUser.RoleType == RoleType.Agent;
+        await SearchTitlePrefixes();
+        if (Id != null && Id != Guid.Empty)
+        {
+            await GetSubjectsById();
+            await GetDocumentsByCaseId();
+            if (CaseId != null)
+                await GetCaseChanges();
+
+            if (_subjectsView.TitlePrefixId != null && _subjectsView.TitlePrefixId != Guid.Empty)
+            {
+                _selectedTitlePrefix = await TitlePrefixeService.GetTitlePrefixesByIdAsync((Guid)_subjectsView.TitlePrefixId);
+                _selectedtitlePrefixeName = titlePrefixe.FirstOrDefault(x => x.Name == _selectedTitlePrefix.Name);
+            }
+            if (_isAdmin)
+            {
+                _addresses = new List<string>();
+                _googleAddress = new List<MudGooglePlacesAutocomplete<string>>();
+
+                foreach (SubjectAddressesViewModel address in _subjectsView.SubjectAddresses)
+                {
+                    _googleAddress.Add(new MudGooglePlacesAutocomplete<string>());
+                    _addresses.Add(address.Address);
+                }
+
+                _subjectAddresses = _subjectsView.SubjectAddresses;
+                _subjectAliases = _subjectsView.SubjectAliases;
+                _subjectEmails = _subjectsView.SubjectEmails;
+                _subjectCompanies = _subjectsView.SubjectCompanies;
+                _subjectTelephones = _subjectsView.SubjectTelephones;
+            }
+            else if (_isAgent)
+            {
+                _isAgent = true;
+                _subjectAliases = _subjectsView.SubjectAliases;
+                _subjectEmails = _subjectsView.SubjectEmails;
+                _subjectCompanies = _subjectsView.SubjectCompanies;
+                _subjectAddresses = _subjectsView.SubjectAddresses;
+                _subjectTelephones = _subjectsView.SubjectTelephones;
+
+                foreach (SubjectAddressesViewModel address in _subjectAddresses)
+                {
+                    _googleAddress.Add(new MudGooglePlacesAutocomplete<string>());
+                    _addresses.Add(address.Address);
+                }
+
+                // If there is a Case Id, try to parse its value to determinate if it's valid
+                if (CaseId != null && CaseStatus != CaseStatusType.CLOSED)
+                {
+                    if (_subjectTraceQuestions.Count == 0 && await RetakeQuestions() == false)
+                        this.Cancel();
+                }
+            }
+            /*
+            if (_subjectsView.AssociatedCompany != null && _subjectsView.AssociatedCompany  != Guid.Empty)
+                {
+                _selectedCompany = await CompaniesService.GetCompaniesByIdAsync((Guid)_subjectsView.AssociatedCompany);
+        }
+        */
+        }
+
+        _loading = false;
+    }
+
+    private async Task<bool> RetakeQuestions()
+    {
+        // if it's an agent, then it's a submit to review of the case. Retrieve the case and update its Status to REVIEW
+        var parameters = new DialogParameters<ManageSubjectAgentSubmit>();
+        parameters.Add("PreviousTraceQuestions", _subjectTraceQuestions);
+        parameters.Add("CaseId", CaseId);
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageSubjectAgentSubmit>("Subject trace questions", parameters, options).Result;
+        if (result.Cancelled)
+            return false;
+        else
+        {
+            _caseTraceQuestions = (List<CaseTraceQuestions>)result.Data;
+            _subjectTraceQuestions = new List<SubjectCaseTraceQuestions>();
+            foreach (CaseTraceQuestions ctq in _caseTraceQuestions)
+            {
+                _subjectTraceQuestions.Add(new SubjectCaseTraceQuestions()
+                    {
+                        Created = (DateTime)ctq.Created,
+                        Answer = ctq.Answer,
+                        Question = ctq.Question,
+                        CreatedBy = _currentLoginUser.GetFullName()
+                    });
+            }
+            return true;
+        }
+
+    }
+
+    //Changes on vb
+    private async Task OpenManageSubjectDialog(Guid? Id)
+    {
+        AddNewAddress();
+        var parameters = new DialogParameters<AddSubjectAddress>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<AddSubjectAddress>("Add Subject Address", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            var updatedAddress = result.Data?.ToString();
+
+            if (!string.IsNullOrEmpty(updatedAddress))
+            {
+                var match = Regex.Match(updatedAddress, @"UpdatedAddress = (.+?)\s*\}");
+                if (match.Success && match.Groups.Count > 1)
+                {
+                    var extractedAddress = match.Groups[1].Value;
+
+                    for (int i = 0; i < _subjectAddresses.Count; i++)
+                    {
+                        if (_subjectAddresses[i].Address == null)
+                        {
+                            _subjectAddresses[i].Address = extractedAddress;
+
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void AddNewAddress()
+    {
+        _googleAddress.Add(new MudBlazor.MudGooglePlacesAutocomplete<string>());
+        _addresses.Add(string.Empty);
+        _subjectAddresses.Add(new SubjectAddressesViewModel());
+        StateHasChanged();
+    }
+
+    // private async void RemoveAddress(int loopIx)
+    // {
+    //     List<SubjectAddressesViewModel> oldAddreses = new List<SubjectAddressesViewModel>();
+    //     for (int i = 0; i < _subjectAddresses.Count; i++)
+    //     {
+    //         if (i != loopIx)
+    //         {
+    //             // The address must be retrieved from the referenced input because when picking it by clicking in google places the bound value is not updated
+    //             string id = _googleAddress[i].InputReference.FieldId;
+    //             try
+    //             {
+    //                 string address = await JSRuntime.InvokeAsync<string>("getInputValueAddress", new object[] { id });
+    //                 _subjectAddresses[i].Address = address;
+    //                 oldAddreses.Add(_subjectAddresses[i]);
+    //             }
+    //             catch (Exception ex) { }
+    //         }
+    //     }
+    //     _subjectAddresses = new List<SubjectAddressesViewModel>();
+    //     _googleAddress = new List<MudGooglePlacesAutocomplete<string>>();
+    //     _addresses = new List<string>();
+    //     StateHasChanged();
+    //     for (int i = 0; i < oldAddreses.Count; i++)
+    //     {
+    //         _googleAddress.Add(new MudGooglePlacesAutocomplete<string>());
+    //         _subjectAddresses.Add(oldAddreses[i]);
+    //     }
+    //     StateHasChanged();
+    // }
+
+    private void RemoveAddress(int indexToRemove)
+    {
+        if (indexToRemove < 0 || indexToRemove >= _subjectAddresses.Count)
+        {
+            return;
+        }
+        // Remove the address at the specified index from _subjectAddresses and _googleAddress
+        _subjectAddresses.RemoveAt(indexToRemove);
+        _googleAddress.RemoveAt(indexToRemove);
+        _addresses.RemoveAt(indexToRemove);
+        StateHasChanged();
+    }
+
+
+
+    private async Task GetSubjectsById()
+    {
+        _subjectsView = await SubjectService.GetSubjectsByIdAsync((Guid)Id);
+    }
+
+    private async Task GetDocumentsByCaseId()
+    {
+        IEnumerable<DocumentViewModel> documents = await DocumentService.GetDocumentsByCaseIdAsync((Guid)Id);
+        _documents = documents.ToList();
+    }
+
+    private async Task GetCaseChanges()
+    {
+        IEnumerable<SubjectChanges> subjectChanges = await SubjectService.GetCaseChangesAsync((Guid)CaseId);
+        _subjectChanges = subjectChanges.ToList();
+
+        IEnumerable<SubjectCaseTraceQuestions> subjectTraceQuestions = await SubjectService.GetTraceQuestionsAnswersAsync((Guid)CaseId);
+        _subjectTraceQuestions = subjectTraceQuestions.ToList();
+    }
+
+    private async Task<IEnumerable<CompaniesViewModel>> SearchCompanies(string value)
+    {
+        IEnumerable<CompaniesViewModel> companiesView = await CompaniesService.GetAllCompaniesAsync();
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            companiesView = companiesView.Where(c => c.CompanyName != null && c.CompanyName.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+
+        return companiesView;
+    }
+
+    // private async Task<IEnumerable<TitlePrefixeViewModel>> SearchTitlePrefixes(string value)
+    // {
+    //     IEnumerable<TitlePrefixeViewModel> titlePrefixes = await TitlePrefixeService.GetAllTitlePrefixesAsync();
+    //     if (!string.IsNullOrWhiteSpace(value))
+    //     {
+    //         titlePrefixes = titlePrefixes.Where(c => c.Name != null && c.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    //     }
+
+    //     return titlePrefixes;
+    // }
+    private async Task SearchTitlePrefixes()
+    {
+        titlePrefixe = (await TitlePrefixeService.GetAllTitlePrefixesAsync()).ToList();
+        StateHasChanged();
+    }
+
+    private async Task<IEnumerable<string>> SearchCountries(string value)
+    {
+        await Task.Delay(5);
+
+        IEnumerable<string> countries = CountryService.GetAllCountries();
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            countries = countries.Where(c => c != null && c.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+
+        return countries;
+    }
+
+    private async Task<IEnumerable<string>> EmailCheck(string value)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(value))
+            errors.Add("Email is required!");
+
+        if (!new EmailAddressAttribute().IsValid(value))
+            errors.Add("Email is invalid.");
+
+        UsersViewModel userView = await UsersService.GetUsersByEmailAddressAsync(value, Id);
+        if (userView != null)
+            errors.Add("Username already exist.");
+
+        return errors;
+    }
+
+    private async Task UploadDocumentFile(IReadOnlyList<IBrowserFile> files)
+    {
+        DocumentViewModel document = new DocumentViewModel();
+        foreach (var file in files)
+        {
+            var fileExtention = GetFileExtension(file.Name);
+            if (fileExtention == "pdf")
+            {
+                IsLoading = true;
+                using (var stream = file.OpenReadStream(1042157))
+                {
+                    using (var memeoryStream = new MemoryStream())
+                    {
+                        await stream.CopyToAsync(memeoryStream);
+                        document.Data = memeoryStream.ToArray();
+                    }
+                }
+                document.Updated = DateTime.UtcNow;
+                document.UpdatedBy = _currentLoginUser.Id;
+                document.Created = DateTime.UtcNow;
+                document.CreatedBy = _currentLoginUser.Id;
+
+                string filePath = Path.Combine("Uploads", file.Name);
+
+                document.FileName = file.Name;
+                document.Size = file.Size;
+                document.DataContentType = file.ContentType;
+                document.FilePath = filePath;
+                document.files = files;
+                _newDocuments.Add(document);
+                IsLoading = false;
+            }
+            else
+            {
+                Snackbar.Add("Please upload a file of type .pdf", Severity.Error);
+                return;
+            }
+        }
+    }
+
+    private async Task SaveSubject(bool closeDialog = true)
+    {
+        await _form.Validate();
+
+        // if (!_form.IsValid)
+        // {
+        try
+        {
+            _subjectsView.Updated = DateTime.UtcNow;
+            _subjectsView.UpdatedBy = _currentLoginUser.Id;
+            _subjectsView.TitlePrefixId = _selectedtitlePrefixeName?.Id;
+            // _subjectsView.AssociatedCompany = _selectedCompany?.Id;
+
+            // Generate concatenated fields. If admin, concatenate all fields, if Agent, concatenate new fields to existing ones
+            for (int i = 0; i < _addresses.Count; i++)
+            {
+                // The address must be retrieved from the referenced input because when picking it by clicking in google places the bound value is not updated
+                string id = _googleAddress[i].InputReference.FieldId;
+
+                try
+                {
+                    string address = await JSRuntime.InvokeAsync<string>("getInputValue", new object[] { id });
+                    _addresses[i] = address;
+                    _subjectAddresses[i].Address = address;
+                }
+                catch (Exception ex) { }
+            }
+
+            if ((RoleType)_currentLoginUser.RoleType == RoleType.InternalAdmin)
+            {
+                _subjectsView.Addresses = string.Join("; ", _addresses.Where(a => a.Trim() != string.Empty));
+
+                _subjectsView.SubjectAddresses =
+                _subjectAddresses.Where(sa => sa.Address.Trim() != string.Empty).Select(sa =>
+                    {
+                        if (sa.SubjectAddressId == null)
+                        {
+                            sa.CaseId = CaseId;
+                            sa.Created = DateTime.UtcNow;
+                            sa.CreatedBy = _currentLoginUser.Id;
+                            sa.Approved = true;
+                        }
+                        return sa;
+                    }).ToList();
+
+                _subjectsView.SubjectAliases =
+                    _subjectAliases.Where(sa => !string.IsNullOrEmpty(sa.Alias)).Select(sa =>
+                    {
+                        if (sa.SubjectAliasId == null)
+                        {
+                            sa.CaseId = CaseId;
+                            sa.Created = DateTime.UtcNow;
+                            sa.CreatedBy = _currentLoginUser.Id;
+                            sa.Approved = true;
+                        }
+                        return sa;
+                    }).ToList();
+
+                _subjectsView.SubjectEmails =
+                    _subjectEmails.Where(se => !string.IsNullOrEmpty(se.Email))
+                    .Select(se =>
+                    {
+                        if (se.SubjectEmailId == null)
+                        {
+                            se.CaseId = CaseId;
+                            se.Created = DateTime.UtcNow;
+                            se.CreatedBy = _currentLoginUser.Id;
+                            se.Approved = true;
+                        }
+                        return se;
+                    }).ToList();
+
+
+
+                _subjectsView.SubjectCompanies =
+                   _subjectCompanies.Where(se => !string.IsNullOrEmpty(se.Company))
+                   .Select(se =>
+                   {
+                       if (se.SubjectCompanyId == null)
+                       {
+                           se.CaseId = CaseId;
+                           se.Created = DateTime.UtcNow;
+                           se.CreatedBy = _currentLoginUser.Id;
+                           se.Approved = true;
+                       }
+                       return se;
+                   }).ToList();
+
+                _subjectsView.SubjectTelephones =
+                _subjectTelephones.Where(se => !string.IsNullOrEmpty(se.TelephoneNumber))
+                .Select(se =>
+                {
+                    if (se.SubjectTelephoneId == null)
+                    {
+                        se.CaseId = CaseId;
+                        se.Created = DateTime.UtcNow;
+                        se.CreatedBy = _currentLoginUser.Id;
+                        se.Approved = true;
+                    }
+                    return se;
+                }).ToList();
+            }
+            else if ((RoleType)_currentLoginUser.RoleType == RoleType.Agent)
+            {
+                // Remove the Addresses of the case and re-add them based on the UI actions
+                _subjectsView.SubjectAddresses = _subjectsView.SubjectAddresses.Where(sa => sa.CaseId != CaseId).ToList();
+                _subjectsView.SubjectAddresses.AddRange(
+                    _subjectAddresses.Select(sa =>
+                    {
+                        sa.Approved = false;
+                        if (sa.SubjectAddressId == null)
+                        {
+                            sa.CaseId = CaseId;
+                            sa.Created = DateTime.UtcNow;
+                            sa.CreatedBy = _currentLoginUser.Id;
+                        }
+                        return sa;
+                    })
+                );
+
+                // Remove the Aliases of the case and re-add them based on the UI actions
+                _subjectsView.SubjectAliases = _subjectsView.SubjectAliases.Where(sa => sa.CaseId != CaseId).ToList();
+                _subjectsView.SubjectAliases.AddRange(
+                    _subjectAliases.Select(sa =>
+                    {
+                        sa.Approved = false;
+                        if (sa.SubjectAliasId == null)
+                        {
+                            sa.CaseId = CaseId;
+                            sa.Created = DateTime.UtcNow;
+                            sa.CreatedBy = _currentLoginUser.Id;
+                        }
+                        return sa;
+                    })
+                );
+
+                // Remove the emails of the case and re-add them based on the UI actions
+                _subjectsView.SubjectEmails = _subjectsView.SubjectEmails.Where(sa => sa.CaseId != CaseId).ToList();
+                _subjectsView.SubjectEmails.AddRange(
+                    _subjectEmails.Select(sa =>
+                    {
+                        sa.Approved = false;
+                        if (sa.SubjectEmailId == null)
+                        {
+                            sa.CaseId = CaseId;
+                            sa.Created = DateTime.UtcNow;
+                            sa.CreatedBy = _currentLoginUser.Id;
+                        }
+                        return sa;
+                    })
+                );
+
+                // Remove the emails of the case and re-add them based on the UI actions
+                _subjectsView.SubjectCompanies = _subjectsView.SubjectCompanies.Where(sa => sa.CaseId != CaseId).ToList();
+                _subjectsView.SubjectCompanies.AddRange(
+                    _subjectCompanies.Select(sa =>
+                    {
+                        sa.Approved = false;
+                        if (sa.SubjectCompanyId == null)
+                        {
+                            sa.CaseId = CaseId;
+                            sa.Created = DateTime.UtcNow;
+                            sa.CreatedBy = _currentLoginUser.Id;
+                        }
+                        return sa;
+                    })
+                );
+
+                // Remove the telephones of the case and re-add them based on the UI actions
+                _subjectsView.SubjectTelephones = _subjectsView.SubjectTelephones.Where(sa => sa.CaseId != CaseId).ToList();
+                _subjectsView.SubjectTelephones.AddRange(
+                    _subjectTelephones.Select(sa =>
+                    {
+                        sa.Approved = false;
+                        if (sa.SubjectTelephoneId == null)
+                        {
+                            sa.CaseId = CaseId;
+                            sa.Created = DateTime.UtcNow;
+                            sa.CreatedBy = _currentLoginUser.Id;
+                        }
+                        return sa;
+                    })
+                );
+            }
+
+            _subjectsView.Addresses = string.Join("; ", _subjectsView.SubjectAddresses.Where(a => a.Address.Trim() != string.Empty).Select(a => a.Address));
+            _subjectsView.Alias = string.Join("; ", _subjectsView.SubjectAliases.Where(a => a.Alias.Trim() != string.Empty).Select(a => a.Alias));
+            _subjectsView.Email = string.Join("; ", _subjectsView.SubjectEmails.Where(a => a.Email.Trim() != string.Empty).Select(a => a.Email));
+            _subjectsView.Company = string.Join("; ", _subjectsView.SubjectCompanies.Where(a => a.Company.Trim() != string.Empty).Select(a => a.Company));
+            _subjectsView.TelephoneNumber = string.Join("; ", _subjectsView.SubjectTelephones.Where(a => a.TelephoneNumber.Trim() != string.Empty).Select(a => a.TelephoneNumber));
+
+            if (Id != null && Id != Guid.Empty)
+            {
+                if (_isAgent == true && CaseId != null)
+                {
+                    await SubjectService.UpdateSubjectsAsync(_subjectsView);
+                    await CaseService.UpdateCaseTraceQuestions((Guid)CaseId, _caseTraceQuestions);
+
+                    CaseViewModel agentCase = await CaseService.GetCasesByIdAsync((Guid)CaseId);
+                    agentCase.Status = (byte)CaseStatusType.REVIEW;
+                    agentCase.UpdatedBy = _currentLoginUser.Id;
+                    agentCase.Updated = DateTime.UtcNow;
+
+                    await CaseService.UpdateCasesAsync(agentCase);
+
+                    AdminCaseReview emailNotifCaseCreatedClient = new AdminCaseReview(configuration.GetValue<string>("SiteUrl"), agentCase.CaseNumber.ToString(), agentCase.Id.ToString(), _currentLoginUser.GetFullName());
+                    await EMailService.SendEMailNotificationToAdminAsync(emailNotifCaseCreatedClient);
+
+                }
+                else
+                {
+                    await SubjectService.UpdateSubjectsAsync(_subjectsView);
+                }
+                if (_isChange == false)
+                {
+                    Snackbar.Add("Successfully saved Subject information.", Severity.Success);
+                    if (closeDialog == true)
+                        MudDialog.Close(DialogResult.Ok(Id));
+                }
+            }
+            else
+            {
+                var Extention = "";
+                // if (_newDocuments.Count() > 0)                     //changes by VB
+
+                if (_newDocuments.Count() >= 0)
+
+                {
+                    _subjectsView.Created = DateTime.UtcNow;
+                    _subjectsView.CreatedBy = _currentLoginUser.Id;
+                    Guid newSubjectId = await SubjectService.InsertSubjectsAsync(_subjectsView);
+
+                    if (closeDialog == true)
+                        MudDialog.Close(DialogResult.Ok(newSubjectId));
+
+                    if (_isChange)
+                    {
+                        Snackbar.Add("Successfully saved Subject information.", Severity.Success);
+                        if (closeDialog == true)
+                            MudDialog.Close(DialogResult.Ok(Id));
+                    }
+                }
+                //changes by VB
+                // else
+                // {
+                //     Snackbar.Add("Please upload a file!", Severity.Error);
+                // }
+                //changes by VB
+
+            }
+            if (_newDocuments.Count() > 0)
+            {
+                foreach (DocumentViewModel document in _newDocuments)
+                {
+                    SubjectViewModel addedData = await SubjectService.GetLastSubjectsAsync();
+                    Id = addedData.Id;
+
+                    document.CaseId = Id;
+                    await DocumentService.InsertDocumentsAsync(document);
+
+                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "UploadedDocument");
+                    var filePath = Path.Combine(uploadsFolder, document.FileName);
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        foreach (var copy in _newDocuments)
+                        {
+                            await stream.WriteAsync(copy.Data, 0, copy.Data.Length);
+                        }
+                    }
+                    document.Data = File.ReadAllBytes(filePath);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Error! Please try again." + ex.Message + "-" + ex.StackTrace, Severity.Error);
+        }
+        // }
+
+
+    }
+
+    private async Task Approve()
+    {
+        _isChange = false;
+        await _form.Validate();
+        foreach (SubjectAddressesViewModel sa in _subjectsView.SubjectAddresses)
+            if (sa.CaseId == CaseId)
+                sa.Approved = true;
+
+        foreach (SubjectEmailViewModel sa in _subjectsView.SubjectEmails)
+            if (sa.CaseId == CaseId)
+                sa.Approved = true;
+
+        foreach (SubjectAliasViewModel sa in _subjectsView.SubjectAliases)
+            if (sa.CaseId == CaseId)
+                sa.Approved = true;
+
+        await SaveSubject(false);
+        if (CaseId != null)
+        {
+            // set the case as closed
+            CaseViewModel agentCase = await CaseService.GetCasesByIdAsync((Guid)CaseId);
+            agentCase.Status = (byte)CaseStatusType.CLOSED;
+            agentCase.UpdatedBy = _currentLoginUser.Id;
+            agentCase.Updated = DateTime.UtcNow;
+
+            await CaseService.UpdateCasesAsync(agentCase);
+            if(agentCase.EndClient !=null)
+            {
+                var agent = await UsersService.GetUsersByIdAsync((Guid)agentCase.EndClient);
+                AdminCaseClosed emailTemplate = new AdminCaseClosed(configuration.GetValue<string>("SiteUrl"), agentCase.CaseNumber.ToString(), agentCase.Id.ToString());
+                await EMailService.SendEMailNotificationToAdminAsync(emailTemplate);
+                var AttachedDocument = new List<DocumentViewModel>();
+                if (_newDocuments.Count() > 0 || _documents.Count() > 0)
+                {
+                    AttachedDocument.AddRange(_newDocuments);
+                    AttachedDocument.AddRange(_documents);
+                }
+                CaseApprovedOrRejected emailToAgent = new CaseApprovedOrRejected();
+                await emailToAgent.Initialized(configuration.GetValue<string>("SiteUrl"),
+                     agentCase.CaseNumber.ToString(), agentCase.Id.ToString(),
+                      agent.FirstName, string.Empty, true, AttachedDocument, agent.EmailAddress, agent.ccEmail);
+            }
+
+            // await EMailService.SendEmailNotificationAsync(emailToAgent, agent.EmailAddress, agent.ccEmail);
+
+            if ((_subjectsView.ClientRef ?? Guid.Empty) != Guid.Empty)
+            {
+                if (_subjectTraceQuestions.Count() != 0)
+                {
+                    // Create the report for the client. First we must gather the information originally provided and add the information added by the agent
+                    string caseResultSummary = @$"Trace result: {_subjectTraceQuestions[0].Answer}<br/>";
+
+                    if (_subjectTraceQuestions[0].Answer != "Negative")
+                    {
+                        string subjectAliases = string.Join(", ", _subjectsView.SubjectAliases.Where(sa => sa.CaseId == CaseId).Select(sa => sa.Alias));
+                        string subjectEmails = string.Join(", ", _subjectsView.SubjectEmails.Where(se => se.CaseId == CaseId).Select(sa => sa.Email));
+                        string subjectAddresses = string.Join(", ", _subjectsView.SubjectAddresses.Where(sa => sa.CaseId == CaseId).Select(sa => sa.Address));
+                        string subjectTelephones = string.Join(", ", _subjectsView.SubjectTelephones.Where(sa => sa.CaseId == CaseId).Select(sa => sa.TelephoneNumber));
+                        caseResultSummary +=
+                            $"Traced address: {(subjectAddresses == "" ? _subjectTraceQuestions[1].Answer : subjectAddresses)}<br/>" +
+                            $"Verification methods: {_subjectTraceQuestions[2].Answer}<br/>";
+                        if (string.IsNullOrEmpty(subjectAliases) == false)
+                            caseResultSummary += $"Alias: {subjectAliases}<br/>";
+                        if (string.IsNullOrEmpty(subjectTelephones) == false)
+                            caseResultSummary += $"Telephone Numbers: {subjectTelephones}<br/>";
+                        if (string.IsNullOrEmpty(subjectEmails) == false)
+                            caseResultSummary += $"Email addresses: {subjectEmails}<br/>";
+                    }
+                    caseResultSummary += $"Notes: {_subjectTraceQuestions[3].Answer}<br/>";
+
+                    string providedInformation = $"Your reference: {agentCase.ClientReference}<br/>" +
+                        $"Subject name: {_subjectsView.FirstName} {_subjectsView.LastName}<br/>";
+
+                    if (_subjectsView.DateOfBirth != null)
+                        providedInformation += $"DOB: {_subjectsView.DateOfBirth?.ToString("dd/MM/yyyy")}<br/>";
+
+                    string subjectAliasesC = string.Join(", ", _subjectsView.SubjectAliases.Where(sa => sa.CaseId == null || sa.CaseId != CaseId).Select(sa => sa.Alias));
+                    string subjectEmailsC = string.Join(", ", _subjectsView.SubjectEmails.Where(se => se.CaseId == null || se.CaseId != CaseId).Select(sa => sa.Email));
+                    string subjectAddressesC = string.Join(", ", _subjectsView.SubjectAddresses.Where(sa => sa.CaseId == null || sa.CaseId != CaseId).Select(sa => sa.Address));
+                    string subjectTelephonesC = string.Join(", ", _subjectsView.SubjectTelephones.Where(sa => sa.CaseId == null || sa.CaseId != CaseId).Select(sa => sa.TelephoneNumber));
+
+                    if (string.IsNullOrEmpty(subjectAddressesC) == false)
+                        providedInformation += $"Address: {subjectAddressesC}<br/>";
+                    if (string.IsNullOrEmpty(subjectAliasesC) == false)
+                        providedInformation += $"Alias: {subjectAliasesC}<br/>";
+                    if (string.IsNullOrEmpty(subjectTelephonesC) == false)
+                        providedInformation += $"Telephone Numbers: {subjectTelephonesC}<br/>";
+                    if (string.IsNullOrEmpty(subjectEmailsC) == false)
+                        providedInformation += $"Email addresses: {subjectEmailsC}<br/>";
+
+                    UsersViewModel client = await UsersService.GetUsersByIdAsync((Guid)_subjectsView.ClientRef);
+                    if(client !=null)
+                    {
+                        CaseReport emailToClient = new CaseReport();
+                        await emailToClient.Initialize(client.FirstName, agentCase.CaseNumber.ToString(), _subjectsView.FirstName + " " + _subjectsView.LastName, caseResultSummary, providedInformation, client.EmailAddress, client.ccEmail);
+                        // await EMailService.SendEmailNotificationAsync(emailToClient, client.EmailAddress, client.ccEmail);
+                    }
+                }
+            }
+        }
+        MudDialog.Close(DialogResult.Ok(Id));
+
+        var CaseIdApproved = await CaseService.GetCaseWatchApproved(CaseId);
+        CaseViewModel agentCasee = await CaseService.GetCasesByIdAsync((Guid)CaseId);
+        if(agentCasee.EndClient !=null)
+        {
+            var agentt = await UsersService.GetUsersByIdAsync((Guid)agentCasee.EndClient);
+            if (CaseIdApproved != Guid.Empty)
+            {
+                CaseWatcherApprovedEmail watcherApprovedEmail = new CaseWatcherApprovedEmail();
+                await watcherApprovedEmail.Initialize(_subjectsView.FirstName + " " + _subjectsView.LastName, agentt.EmailAddress, agentt.ccEmail);
+                //await EMailService.SendEmailNotificationAsync(watcherApprovedEmail, agentt.EmailAddress, agentt.ccEmail);
+            }
+        }
+    }
+    private async Task Reject()
+    {
+            if (CaseId != null)
+            {
+                var parameters = new DialogParameters<ConfirmationDialogContent>();
+                parameters.Add(x => x.ContentText, $"Do you really want to reject this case record?");
+                parameters.Add(x => x.ButtonText, "Yes");
+                parameters.Add(x => x.Color, Color.Error);
+                parameters.Add(x => x.RequestNotes, true);
+                var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+                DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+                if (!result.Canceled)
+                {
+                    //string notes = result.Data.ToString();
+                    // if it's an agent, then it's a submit to review of the case. Retrieve the case and update its Status to REVIEW
+                    CaseViewModel agentCase = await CaseService.GetCasesByIdAsync((Guid)CaseId);
+                    agentCase.Status = (byte)CaseStatusType.OPEN;
+                    agentCase.UpdatedBy = _currentLoginUser.Id;
+                    agentCase.Updated = DateTime.UtcNow;
+                    agentCase.Notes = result.Data?.ToString() ?? string.Empty;
+                    await CaseService.UpdateCasesAsync(agentCase);
+                    var AttachedDocument = new List<DocumentViewModel>();
+                    if (agentCase.EndClient != null)
+                    {
+                        var agent = await UsersService.GetUsersByIdAsync((Guid)agentCase.EndClient);
+                        AttachedDocument.AddRange(_newDocuments);
+                        AttachedDocument.AddRange(_documents);
+                        CaseApprovedOrRejected emailToAgent = new CaseApprovedOrRejected();
+                        await emailToAgent.Initialized(configuration.GetValue<string>("SiteUrl"),
+                             agentCase.CaseNumber.ToString(), agentCase.Id.ToString(),
+                              agent.FirstName, agentCase.Notes, false, AttachedDocument, agent.EmailAddress, agent.ccEmail);
+                    }
+                    //await EMailService.SendEmailNotificationAsync(emailToAgent, agent.EmailAddress, null);
+                }
+            }
+            MudDialog.Close(DialogResult.Ok(Id));
+    }
+
+    private async Task RemoveDocument(DocumentViewModel document, bool isNew)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this document record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            if (isNew)
+            {
+                _newDocuments.Remove(document);
+            }
+            else
+            {
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "UploadedDocument", document.FileName);
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+                await DocumentService.DeleteDocumentsAsync(document.Id);
+                await GetDocumentsByCaseId();
+            }
+
+            Snackbar.Add($"Successfully removed document.", Severity.Success);
+        }
+    }
+
+    private async Task DownloadDocument(DocumentViewModel document)
+    {
+        try
+        {
+            if (document.Data != null && document.Data.Length > 0)
+            {
+                await JSRuntime.InvokeVoidAsync("downloadFile", document.Data, document.FileName);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add($"Error! Please try again.", Severity.Error);
+        }
+    }
+
+    // private async Task OpenManageCompanyDialog(Guid? Id)
+    // {
+    //     var parameters = new DialogParameters<ManageCompany>();
+    //     parameters.Add(x => x.Id, Id);
+
+    //     DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+    //     DialogResult result = await Dialog.Show<ManageCompany>("Company", parameters, options).Result;
+
+    //     if (!result.Canceled)
+    //     {
+    //         _subjectsView.AssociatedCompany = (Guid)result.Data;
+    //         if (_subjectsView.AssociatedCompany != null && _subjectsView.AssociatedCompany != Guid.Empty)
+    //         {
+    //             _selectedCompany = await CompaniesService.GetCompaniesByIdAsync((Guid)_subjectsView.AssociatedCompany);
+    //         }
+    //     }
+    // }
+
+    void Cancel() => MudDialog.Cancel();
+    public string GetFileExtension(string fileName)
+    {
+        if (!string.IsNullOrEmpty(fileName))
+        {
+            string extension = Path.GetExtension(fileName);
+            if (!string.IsNullOrEmpty(extension))
+            {
+                return extension.Substring(1);
+            }
+        }
+        return string.Empty;
+    }
+
+}  

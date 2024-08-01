@@ -1,0 +1,1258 @@
+﻿@page "/cases"
+@* @page "/cases/{caseId?}" *@
+
+@using System.Net.Http.Json
+@using System.Net;
+@using CMS.DL.Model;
+@using CaseManagementSystem.Data
+@using CaseManagementSystem.Data.Cases;
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Enum
+@using CaseManagementSystem.Data.Users;
+@using CaseManagementSystem.Helpers
+@using System.Data;
+@using System.Net;
+@using System.Text;
+@using Microsoft.AspNetCore.WebUtilities;
+@using Newtonsoft.Json
+@using System.Net.Http.Headers
+@using Newtonsoft.Json.Linq
+@using CaseManagementSystem.Data.Subjects;
+
+@inject IDialogService Dialog
+@inject CaseService CaseService
+@inject ISnackbar Snackbar
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject UsersService UsersService
+@inject ICryptoService CryptoServices
+@inject IJSRuntime JS;
+@inject SubjectService SubjectService
+<style>
+    .company-list-th {
+        color: #5c6479 !important;
+        font-size: 13px;
+    }
+
+    thead tr td {
+        width: 25%;
+    }
+
+    .form-control .mud-input-control {
+        display: block;
+        width: 100%;
+        padding: 0.3rem 1rem;
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #5c6479;
+        appearance: none;
+        background-color: #5c64791f;
+        background-clip: padding-box;
+        border: 1px solid #5c647936;
+        border-radius: 0.475rem;
+        box-shadow: false;
+        transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    }
+
+    .customInputwidth {
+        width: 210px;
+    }
+
+    .export-btn {
+        position: relative;
+    }
+
+    .mud-input.mud-input-underline:before {
+        border-bottom: 0px
+    }
+
+    .mud-input-control > .mud-input-control-input-container > div.mud-input.mud-input-text {
+        margin-top: 0px;
+    }
+
+    .mud-table-root {
+        padding-top: 8px;
+    }
+
+    .mud-table-cell {
+        font-size: 12px;
+    }
+
+    .mud-table-toolbar {
+        position: relative;
+        flex-wrap: wrap;
+        row-gap: 12px;
+        height: 100%;
+        width: 100%;
+    }
+
+    .mud-button-filled.mud-button-filled-primary {
+        background-color: #774991 !important;
+    }
+
+        .mud-button-filled.mud-button-filled-primary:hover, .mud-button-filled.mud-button-filled-primary:focus-visible {
+            background-color: #995FBA !important;
+        }
+
+    .mud-primary-text {
+        color: #774991 !important;
+    }
+
+    .mud-tooltip-root {
+        width: max-content;
+    }
+</style>
+
+<PageTitle>Cases</PageTitle>
+@* <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@FilterByDateRange">Apply</MudButton> *@
+<MudText Typo="Typo.h5" Class="mb-2"> <b>Cases</b></MudText>
+<MudTabs Elevation="2" class="tab-btn" AlwaysShowScrollButtons="true" Rounded="true" PrevIcon="@Icons.Material.Filled.SkipPrevious" NextIcon="@Icons.Material.Filled.SkipNext" ApplyEffectsToContainer="true" PanelClass="">
+    <MudTabPanel Text="All Cases">
+        @if (CustomAuthenticationStateProvider.RoleType() == "Client")
+        {
+            <MudTable Items="@_cases" Hover="true" AllowUnsorted="false" Filter=" new Func<CaseViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+                <ToolBarContent>
+                    <div class="d-flex justify-space-between align-items-center flex-grow-1 ">
+                        <div class="d-flex">
+                            <div class="form-control customInputwidth mr-2">
+                                <MudTextField style="margin-top:0px;" @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Small"></MudTextField>
+                            </div>
+
+                            <div class="d-flex form-control align-items-center mr-2 customInputwidth">
+                                <MudDatePicker @bind-Date="_startDate" Format="CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern" Placeholder="Start Date" />
+                            </div>
+
+                            <div class="d-flex form-control align-items-center mr-2 customInputwidth">
+                                <MudDatePicker @bind-Date="_endDate" Format="CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern" Placeholder="End Date" />
+                            </div>
+
+                            <div class="d-flex align-center">
+                                <MudIconButton Style="height: 26px; padding: 1px;" Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" @onclick="@ClearDates"></MudIconButton>
+                                <MudIconButton Style="height: 26px; padding: 1px;" Color="Color.Primary" Icon="@Icons.Material.Filled.Search" @onclick="@FilterByDateRange"></MudIconButton>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Agent")
+                        {
+                            <div class="d-flex export-btn align-content-center justify-end mb-2 me-2">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportCaseDataCsv(1))">Export to CSV</MudButton>
+                                @if (CustomAuthenticationStateProvider.RoleType() == "Internal" || CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+                                {
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => GetAuthorization())">Sync QB</MudButton>
+                                }
+                                @if (CustomAuthenticationStateProvider.RoleType() != "Client")
+                                {
+                                    <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" OnClick="@((e) => OpenManageCaseDialog(null))">Create</MudButton>
+                                }
+                            </div>
+
+                        }
+                    </div>
+
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTd><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<CaseViewModel, object>(x=>x.CaseNumber)"><span class="company-list-th">Case ID </span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.TraceLevelName)"><span class="company-list-th">Trace Level</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.SubjectName)"><span class="company-list-th">Subject</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Status)"><span class="company-list-th">Status</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Fee)"><span class="company-list-th">Fee </span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.ClientReference)"><span class="company-list-th">Client Reference</span></MudTableSortLabel></MudTd>
+                    <MudTd>Notes</MudTd>
+                    <MudTd></MudTd>
+                    <MudTd></MudTd>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Case Number">@context.CaseNumber</MudTd>
+                    <MudTd DataLabel="Trace Level">@context.TraceLevelName</MudTd>
+                    <MudTd DataLabel="Subject">@context.SubjectName</MudTd>
+                    <MudTd DataLabel="Status">
+                        @if ((CaseStatusType)@context.Status == CaseStatusType.REVIEW)
+                        {
+
+                            <MudLink @onclick="@(() => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))">@context.GetStatusName()</MudLink>
+                        }
+                        else
+                        {
+                            @context.GetStatusName()
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Fee">@context.Fee</MudTd>
+                    <MudTd DataLabel="ClientRef">@context.CreatedByName</MudTd>
+                    <MudTd>@context.Notes</MudTd>
+                    @if (!string.IsNullOrEmpty(context.FilePath))
+                    {
+                        <MudTd DataLabel="Download" style="padding: 0; margin: 0;">
+
+                            <MudTooltip Text="Download Case Report" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.FileDownload" Color="Color.Primary" aria-label="Download" OnClick="@((e) => DownloadCaseReportFile(@context.Id, @context.SubjectId))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+                    }
+                    else
+                    {
+                        <MudTd DataLabel="Download" style="padding: 0; margin: 0;">
+
+
+                        </MudTd>
+                    }
+                    <MudTd>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+        else
+        {
+            <MudTable Items="@_cases" Hover="true" AllowUnsorted="false" Filter=" new Func<CaseViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+                <ToolBarContent>
+                    <div class="d-flex justify-space-between align-items-center flex-grow-1 ">
+                        <div class="d-flex">
+                            <div class="form-control customInputwidth mr-2">
+                                <MudTextField style="margin-top:0px;" @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Small"></MudTextField>
+                            </div>
+
+                            <div class="d-flex form-control align-items-center mr-2 customInputwidth">
+                                <MudDatePicker @bind-Date="_startDate" Format="CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern" Placeholder="Start Date" />
+                            </div>
+
+                            <div class="d-flex form-control align-items-center mr-2 customInputwidth">
+                                <MudDatePicker @bind-Date="_endDate" Format="CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern" Placeholder="End Date" />
+                            </div>
+
+                            <div class="d-flex align-center">
+                                <MudIconButton Style="height: 26px; padding: 1px;" Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" @onclick="@ClearDates"></MudIconButton>
+                                <MudIconButton Style="height: 26px; padding: 1px;" Color="Color.Primary" Icon="@Icons.Material.Filled.Search" @onclick="@FilterByDateRange"></MudIconButton>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Agent")
+                        {
+                            <div class="d-flex export-btn align-content-center justify-end mb-2 me-2">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportCaseDataCsv(1))">Export to CSV</MudButton>
+                                @if (CustomAuthenticationStateProvider.RoleType() == "Internal" || CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+                                {
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => GetAuthorization())">Sync QB</MudButton>
+                                }
+                                @if (CustomAuthenticationStateProvider.RoleType() != "Client")
+                                {
+                                    <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" OnClick="@((e) => OpenManageCaseDialog(null))">Create</MudButton>
+                                }
+                            </div>
+
+                        }
+                    </div>
+
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTd><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<CaseViewModel, object>(x=>x.CaseNumber)"><span class="company-list-th">Case ID </span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Created)"><span class="company-list-th">Date Added</span> </MudTableSortLabel></MudTd>
+                    <MudTd><span class="company-list-th">Case Type</span></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.TraceLevelName)"><span class="company-list-th">Trace Level</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.SubjectName)"><span class="company-list-th">Subject</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Status)"><span class="company-list-th">Status</span></MudTableSortLabel></MudTd>
+                    <MudTd><span class="company-list-th">Report Sent</span></MudTd>
+                    <MudTd><span class="company-list-th">Result</span></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Fee)"><span class="company-list-th">Fee </span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.CompanyName)"><span class="company-list-th">Company</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.CreatedByName)"><span class="company-list-th">Created By</span></MudTableSortLabel></MudTd>
+                    <MudTd></MudTd>
+                    <MudTd></MudTd>
+                    <MudTd></MudTd>
+                    <MudTd></MudTd>
+                    @*             @if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+                {
+                *@                <MudTd></MudTd>
+                    @* } *@
+                </HeaderContent>
+                <RowTemplate>
+
+                    @* <MudTd DataLabel="Case Number">@context.CaseNumber</MudTd> *@
+                    <MudTd Class="thead tableData-padding" DataLabel="Case Number">
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Agent" && CustomAuthenticationStateProvider.RoleType() != "Internal")
+                        {
+                            <MudLink @onclick="@(() => OpenManageCaseDialog(@context.Id,true))">@context.CaseNumber</MudLink>
+                        }
+                        else
+                        {
+                            <MudTb>@context.CaseNumber</MudTb>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Date Added">@context.Created?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                    <MudTd DataLabel="Case Type"></MudTd>
+                    <MudTd DataLabel="Trace Level">@context.TraceLevelName</MudTd>
+                    <MudTd DataLabel="Subject">@context.SubjectName</MudTd>
+                    <MudTd DataLabel="Status">
+                        @if ((CaseStatusType)@context.Status == CaseStatusType.REVIEW)
+                        {
+
+                            <MudLink @onclick="@(() => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))">@context.GetStatusName()</MudLink>
+                        }
+                        else
+                        {
+                            @context.GetStatusName()
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Report Sent">@context.Updated?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                    <MudTd DataLabel="Result"></MudTd>
+                    <MudTd DataLabel="Fee">@context.Fee</MudTd>
+                    <MudTd DataLabel="Company">@context.CompanyName</MudTd>
+                    <MudTd DataLabel="Created By">@context.CreatedByName</MudTd>
+                    @*             @if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+                {*@
+                    <MudTd DataLabel="View Job" style="padding-right: 3px; padding-left: 0px;">
+                        <MudTooltip Text="View Job" Color="Color.Primary" Placement="Placement.Top">
+                            <MudIconButton Icon="fas fa-eye" Color="Color.Primary" aria-label="View Job" OnClick="@((e) => OpenManageAgentCaseDialog(@context.Id))"></MudIconButton>
+                        </MudTooltip>
+                    </MudTd>
+                    @* } *@
+                    @if (!string.IsNullOrEmpty(context.FilePath))
+                    {
+                        <MudTd DataLabel="Download" style="padding: 0; margin: 0;">
+
+                            <MudTooltip Text="Download Case Report" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.FileDownload" Color="Color.Primary" aria-label="Download" OnClick="@((e) => DownloadCaseReportFile(@context.Id, @context.SubjectId))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+                    }
+                    else
+                    {
+                        <MudTd DataLabel="Download" style="padding: 0; margin: 0;">
+                        </MudTd>
+                    }
+                    @if (CustomAuthenticationStateProvider.RoleType() != "Client")
+                    {
+                        @if ((CaseStatusType)@context.Status != CaseStatusType.CLOSED)
+                        {
+                            <MudTd DataLabel="Edit" style="padding: 0; margin: 0;">
+                                <MudTooltip Text="Edit Case" Color="Color.Primary" Placement="Placement.Top">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCaseDialog(@context.Id))"></MudIconButton>
+                                </MudTooltip>
+                            </MudTd>
+                            <MudTd DataLabel="Remove" style="padding: 0; margin: 0;">
+                                <MudTooltip Text="Remove Case" Color="Color.Primary" Placement="Placement.Top">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveCase(@context.Id))"></MudIconButton>
+                                </MudTooltip>
+                            </MudTd>
+                            <MudTd DataLabel="View Subject" style="padding: 0; margin: 0;">
+                                @if (context.SubjectId != null)
+                                {
+                                    <MudTooltip Text="View Subject" Color="Color.Primary" Placement="Placement.Top">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Person" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))"></MudIconButton>
+                                    </MudTooltip>
+                                }
+                            </MudTd>
+                        }
+                    }
+                    else
+                    {
+                        <MudTd>
+                            @*           <MudTooltip Text="Edit Case" Color="Color.Primary" Placement="Placement.Top">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCaseDialog(@context.Id))"></MudIconButton>
+                    </MudTooltip>*@
+                        </MudTd>
+                        <MudTd>
+
+                        </MudTd>
+                        <MudTd>
+                        </MudTd>
+                    }
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudTabPanel>
+    <MudTabPanel Text="My Cases">
+        @if (CustomAuthenticationStateProvider.RoleType() == "Client")
+        {
+            <MudTable Items="@_mycase" Hover="true" AllowUnsorted="false" Filter=" new Func<CaseViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+                <ToolBarContent>
+                    <div class="d-flex justify-space-between align-items-center flex-grow-1 ">
+                        <div class="d-flex">
+                            <div class="form-control customInputwidth mr-2">
+                                <MudTextField style="margin-top:0px;" @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Small"></MudTextField>
+                            </div>
+
+                            <div class="d-flex form-control align-items-center mr-2 customInputwidth">
+                                <MudDatePicker @bind-Date="_startDate" Format="CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern" Placeholder="Start Date" />
+                            </div>
+
+                            <div class="d-flex form-control align-items-center mr-2 customInputwidth">
+                                <MudDatePicker @bind-Date="_endDate" Format="CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern" Placeholder="End Date" />
+                            </div>
+
+                            <div class="d-flex align-center">
+                                <MudIconButton Style="height: 26px; padding: 1px;" Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" @onclick="@ClearDates"></MudIconButton>
+                                <MudIconButton Style="height: 26px; padding: 1px;" Color="Color.Primary" Icon="@Icons.Material.Filled.Search" @onclick="@FilterByDateRange"></MudIconButton>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Agent")
+                        {
+                            <div class="d-flex export-btn align-content-center justify-end mb-2 me-2">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportCaseDataCsv(2))">Export to CSV</MudButton>
+                                @if (CustomAuthenticationStateProvider.RoleType() == "Internal" || CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+                                {
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => GetAuthorization())">Sync QB</MudButton>
+                                }
+                                @if (CustomAuthenticationStateProvider.RoleType() != "Client")
+                                {
+                                    <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" OnClick="@((e) => OpenManageCaseDialog(null))">Create</MudButton>
+                                }
+                            </div>
+
+                        }
+                    </div>
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTd><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<CaseViewModel, object>(x=>x.CaseNumber)"><span class="company-list-th">Case ID </span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.TraceLevelName)"><span class="company-list-th">Trace Level</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.SubjectName)"><span class="company-list-th">Subject</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Status)"><span class="company-list-th">Status</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Fee)"><span class="company-list-th">Fee </span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.ClientReference)"><span class="company-list-th">Client Reference</span></MudTableSortLabel></MudTd>
+                    <MudTd>Notes</MudTd>
+                    <MudTd></MudTd>
+                    <MudTd></MudTd>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Case Number">@context.CaseNumber</MudTd>
+                    <MudTd DataLabel="Trace Level">@context.TraceLevelName</MudTd>
+                    <MudTd DataLabel="Subject">@context.SubjectName</MudTd>
+                    <MudTd DataLabel="Status">
+                        @if ((CaseStatusType)@context.Status == CaseStatusType.REVIEW)
+                        {
+
+                            <MudLink @onclick="@(() => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))">@context.GetStatusName()</MudLink>
+                        }
+                        else
+                        {
+                            @context.GetStatusName()
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Fee">@context.Fee</MudTd>
+                    <MudTd DataLabel="ClientRef">@context.CreatedByName</MudTd>
+                    <MudTd>@context.Notes</MudTd>
+                    @if (!string.IsNullOrEmpty(context.FilePath))
+                    {
+                        <MudTd DataLabel="Download" style="padding: 0; margin: 0;">
+
+                            <MudTooltip Text="Download Case Report" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.FileDownload" Color="Color.Primary" aria-label="Download" OnClick="@((e) => DownloadCaseReportFile(@context.Id, @context.SubjectId))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+                    }
+                    else
+                    {
+                        <MudTd DataLabel="Download" style="padding: 0; margin: 0;">
+
+
+                        </MudTd>
+                    }
+                    <MudTd>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+        else
+        {
+            <MudTable Items="@_mycase" Hover="true" AllowUnsorted="false" Filter=" new Func<CaseViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+                <ToolBarContent>
+                    <div class="d-flex justify-space-between align-items-center flex-grow-1 ">
+                        <div class="d-flex">
+                            <div class="form-control customInputwidth mr-2">
+                                <MudTextField style="margin-top:0px;" @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Small"></MudTextField>
+                            </div>
+
+                            <div class="d-flex form-control align-items-center mr-2 customInputwidth">
+                                <MudDatePicker @bind-Date="_startDate" Format="CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern" Placeholder="Start Date" />
+                            </div>
+
+                            <div class="d-flex form-control align-items-center mr-2 customInputwidth">
+                                <MudDatePicker @bind-Date="_endDate" Format="CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern" Placeholder="End Date" />
+                            </div>
+
+                            <div class="d-flex align-center">
+                                <MudIconButton Style="height: 26px; padding: 1px;" Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" @onclick="@ClearDates"></MudIconButton>
+                                <MudIconButton Style="height: 26px; padding: 1px;" Color="Color.Primary" Icon="@Icons.Material.Filled.Search" @onclick="@FilterByDateRange"></MudIconButton>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Agent")
+                        {
+                            <div class="d-flex export-btn align-content-center justify-end mb-2 me-2">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportCaseDataCsv(2))">Export to CSV</MudButton>
+                                @if (CustomAuthenticationStateProvider.RoleType() == "Internal" || CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+                                {
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => GetAuthorization())">Sync QB</MudButton>
+                                }
+                                @if (CustomAuthenticationStateProvider.RoleType() != "Client")
+                                {
+                                    <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" OnClick="@((e) => OpenManageCaseDialog(null))">Create</MudButton>
+                                }
+                            </div>
+
+                        }
+                    </div>
+
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTd><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<CaseViewModel, object>(x=>x.CaseNumber)"><span class="company-list-th">Case ID </span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Created)"><span class="company-list-th">Date Added</span> </MudTableSortLabel></MudTd>
+                    <MudTd><span class="company-list-th">Case Type</span></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.TraceLevelName)"><span class="company-list-th">Trace Level</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.SubjectName)"><span class="company-list-th">Subject</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Status)"><span class="company-list-th">Status</span></MudTableSortLabel></MudTd>
+                    <MudTd><span class="company-list-th">Report Sent</span></MudTd>
+                    <MudTd><span class="company-list-th">Result</span></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.Fee)"><span class="company-list-th">Fee </span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.CompanyName)"><span class="company-list-th">Company</span></MudTableSortLabel></MudTd>
+                    <MudTd><MudTableSortLabel SortBy="new Func<CaseViewModel, object>(x=>x.CreatedByName)"><span class="company-list-th">Created By</span></MudTableSortLabel></MudTd>
+                    <MudTd></MudTd>
+                    <MudTd></MudTd>
+                    <MudTd></MudTd>
+                    <MudTd></MudTd>
+                    @*             @if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+                {
+                *@                <MudTd></MudTd>
+                    @* } *@
+                </HeaderContent>
+                <RowTemplate>
+
+                    @* <MudTd DataLabel="Case Number">@context.CaseNumber</MudTd> *@
+                    <MudTd Class="thead tableData-padding" DataLabel="Case Number">
+                        @if (CustomAuthenticationStateProvider.RoleType() != "Agent" && CustomAuthenticationStateProvider.RoleType() != "Internal")
+                        {
+                            <MudLink @onclick="@(() => OpenManageCaseDialog(@context.Id,true))">@context.CaseNumber</MudLink>
+                        }
+                        else
+                        {
+                            <MudTb>@context.CaseNumber</MudTb>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Date Added">@context.Created?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                    <MudTd DataLabel="Case Type"></MudTd>
+                    <MudTd DataLabel="Trace Level">@context.TraceLevelName</MudTd>
+                    <MudTd DataLabel="Subject">@context.SubjectName</MudTd>
+                    <MudTd DataLabel="Status">
+                        @if ((CaseStatusType)@context.Status == CaseStatusType.REVIEW)
+                        {
+
+                            <MudLink @onclick="@(() => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))">@context.GetStatusName()</MudLink>
+                        }
+                        else
+                        {
+                            @context.GetStatusName()
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Report Sent">@context.Updated?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                    <MudTd DataLabel="Result"></MudTd>
+                    <MudTd DataLabel="Fee">@context.Fee</MudTd>
+                    <MudTd DataLabel="Company">@context.CompanyName</MudTd>
+                    <MudTd DataLabel="Created By">@context.CreatedByName</MudTd>
+                    @*             @if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+                {*@
+                    <MudTd DataLabel="View Job" style="padding-right: 3px; padding-left: 0px;">
+                        <MudTooltip Text="View Job" Color="Color.Primary" Placement="Placement.Top">
+                            <MudIconButton Icon="fas fa-eye" Color="Color.Primary" aria-label="View Job" OnClick="@((e) => OpenManageAgentCaseDialog(@context.Id))"></MudIconButton>
+                        </MudTooltip>
+                    </MudTd>
+                    @* } *@
+                    @if (!string.IsNullOrEmpty(context.FilePath))
+                    {
+                        <MudTd DataLabel="Download" style="padding: 0; margin: 0;">
+
+                            <MudTooltip Text="Download Case Report" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.FileDownload" Color="Color.Primary" aria-label="Download" OnClick="@((e) => DownloadCaseReportFile(@context.Id, @context.SubjectId))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+                    }
+                    else
+                    {
+                        <MudTd DataLabel="Download" style="padding: 0; margin: 0;">
+                        </MudTd>
+                    }
+                    @if (CustomAuthenticationStateProvider.RoleType() != "Client")
+                    {
+                        @if ((CaseStatusType)@context.Status != CaseStatusType.CLOSED)
+                        {
+                            <MudTd DataLabel="Edit" style="padding: 0; margin: 0;">
+                                <MudTooltip Text="Edit Case" Color="Color.Primary" Placement="Placement.Top">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCaseDialog(@context.Id))"></MudIconButton>
+                                </MudTooltip>
+                            </MudTd>
+                            <MudTd DataLabel="Remove" style="padding: 0; margin: 0;">
+                                <MudTooltip Text="Remove Case" Color="Color.Primary" Placement="Placement.Top">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveCase(@context.Id))"></MudIconButton>
+                                </MudTooltip>
+                            </MudTd>
+                            <MudTd DataLabel="View Subject" style="padding: 0; margin: 0;">
+                                @if (context.SubjectId != null)
+                                {
+                                    <MudTooltip Text="View Subject" Color="Color.Primary" Placement="Placement.Top">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Person" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageSubjectDialog(context.SubjectId, @context.Id, (CaseStatusType)(@context.Status ?? 1)))"></MudIconButton>
+                                    </MudTooltip>
+                                }
+                            </MudTd>
+                        }
+                    }
+                    else
+                    {
+                        <MudTd>
+                            @*           <MudTooltip Text="Edit Case" Color="Color.Primary" Placement="Placement.Top">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageCaseDialog(@context.Id))"></MudIconButton>
+                    </MudTooltip>*@
+                        </MudTd>
+                        <MudTd>
+
+                        </MudTd>
+                        <MudTd>
+                        </MudTd>
+                    }
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudTabPanel>
+</MudTabs>
+@code {
+    [ParameterAttribute]
+    public string? caseId { get; set; }
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+    private CaseViewModel _selectedItem = null;
+    private IEnumerable<CaseViewModel> _cases = new List<CaseViewModel>();
+    private IEnumerable<CaseViewModel> _mycase = new List<CaseViewModel>();
+    private string _searchString = "";
+    private string authorizationCode;
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+    private IEnumerable<SubjectViewModel> _subjects = new List<SubjectViewModel>();
+    private List<CaseViewModel> cases;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CustomAuthenticationStateProvider.IsAuthenticated())
+        {
+            NavigationManager.NavigateTo("/");
+        }
+
+        if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+        {
+            NavigationManager.NavigateTo("/index");
+        }
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        if (query.ContainsKey("code"))
+        {
+            authorizationCode = query["code"];
+            var accessToken = await GetAccessToken(authorizationCode);
+            // var casesNotSynced = await CaseService.GetCasesIsNotSynced();
+            await CreateCustomers(accessToken);
+        }
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+
+        await GetCases();
+        await MyCases();
+        string url = NavigationManager.Uri;
+        string[] segments = url.Split('=');
+        string lastSegment = segments[segments.Length - 1];
+        if (CustomAuthenticationStateProvider.RoleType() == "Client" || CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+        {
+            if (lastSegment != "cases")
+            {
+                GetIdFromUrl();
+            };
+        }
+        if (lastSegment == "1" || lastSegment == "2" || lastSegment == "5" || lastSegment == "7")
+        {
+            await GetCasesStatusList(lastSegment);
+        }
+    }
+
+    private async Task GetCasesStatusList(string id)
+    {
+        if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+        {
+            var caselist = await CaseService.GetAllCasesAsync();
+            byte? byteValue = byte.Parse(id);
+            _cases = caselist.Where(x => x.Status == byteValue).ToList();
+        }
+        else if (CustomAuthenticationStateProvider.RoleType() == "Client")
+        {
+            var caselist = await CaseService.GetCasesByClientAsync(_currentLoginUser.Id);
+            byte? byteValue = byte.Parse(id);
+            _cases = caselist.Where(x => x.Status == byteValue).ToList();
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+        {
+            var caselist = await CaseService.GetAllCasesAsync();
+            byte? byteValue = byte.Parse(id);
+            _cases = caselist.Where(x => x.Status == byteValue).ToList();
+
+        }
+    }
+
+    private async Task OpenManageCaseDialog(Guid? Id, bool isEditable)
+    {
+        var parameters = new DialogParameters<ManageCase>();
+        parameters.Add(x => x.Id, Id);
+        parameters.Add(x => x.View, isEditable);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageCase>("Case", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetCases();
+            await MyCases();
+        }
+    }
+
+
+    private async Task ClearDates()
+    {
+        await GetCases();
+        _startDate = null;
+        _endDate = null;
+    }
+
+    private async Task FilterByDateRange()
+    {
+        IEnumerable<CaseViewModel> filteredCases;
+        IEnumerable<CaseViewModel> allcases = await CaseService.GetAllCasesAsync();
+        if (_startDate.HasValue && _endDate.HasValue)
+        {
+
+            filteredCases = allcases.Where(c => c.Created.HasValue &&
+                                            c.Created.Value.Date >= _startDate.Value.Date &&
+                                            c.Created.Value.Date <= _endDate.Value.Date);
+
+        }
+        else if (_startDate.HasValue)
+        {
+            filteredCases = allcases.Where(c => c.Created >= _startDate);
+        }
+        else if (_endDate.HasValue)
+        {
+            filteredCases = allcases.Where(c => c.Created <= _endDate);
+        }
+        else
+        {
+            filteredCases = allcases;
+        }
+
+        _cases = filteredCases.ToList();
+    }
+    private async void GetIdFromUrl()
+    {
+        string url = NavigationManager.Uri;
+        string[] segments = url.Split('=');
+        string lastSegment = segments[segments.Length - 1];
+        if (lastSegment != "2" && lastSegment != "5" && lastSegment != "7")
+        {
+            if (int.TryParse(lastSegment, out int id))
+            {
+                var dataId = await CaseService.GetCaseNumberId(id);
+                var parameters = new DialogParameters<CaseNumberDetails>();
+                parameters.Add(x => x.Id, dataId);
+                DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+                DialogResult result = await Dialog.Show<CaseNumberDetails>("CaseNumber", parameters, options).Result;
+            }
+        }
+
+        // else
+        // {
+        //     Snackbar.Add("Failed to parse ID from URL.", Severity.Error);
+        // }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender == true)
+        {
+            // If there is a Case Id, try to parse its value to determinate if it's valid
+            if (caseId != null)
+            {
+                try
+                {
+                    string decCaseId = CryptoServices.DecryptStringEscaped(caseId);
+                    Guid newCaseId = new Guid(decCaseId);
+                    CaseViewModel caseData = await CaseService.GetCasesByIdAsync(newCaseId);
+
+                    await OpenManageSubjectDialog(caseData.SubjectId, caseData.Id, (CaseStatusType)(caseData.Status ?? 1));
+                }
+                catch (Exception ex)
+                {
+                    // received case Id is invalid, set it to null
+                    caseId = null;
+                }
+            }
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task GetCases()
+    {
+        if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+        {
+            _cases = await CaseService.GetAllCasesAsync();
+        }
+        else if (CustomAuthenticationStateProvider.RoleType() == "Client")
+        {
+
+            _cases = await CaseService.GetCasesByClientAsync(_currentLoginUser.Id);
+
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+        {
+            _cases = await CaseService.GetAllCasesAsync();
+        }
+    }
+
+    private async Task MyCases()
+    {
+        if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+        {
+            _mycase = await CaseService.GetCasesByCreatedByAsync(_currentLoginUser.Id);
+        }
+        else if (CustomAuthenticationStateProvider.RoleType() == "Client")
+        {
+            _cases = await CaseService.GetCasesByClientAsync(_currentLoginUser.Id);
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+        {
+            _mycase = await CaseService.GetCasesByCreatedByAsync(_currentLoginUser.Id);
+        }
+    }
+
+
+    private bool FilterFuncCallBack(CaseViewModel cases) => FilterFunc(cases, _searchString);
+
+    private bool FilterFunc(CaseViewModel cases, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+
+        if ((cases?.CompanyName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((cases?.CaseNumber.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((cases?.GetStatusName()?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if (cases?.Created?.ToString("dd/MM/yyyy HH:mm:ss").Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false)
+            return true;
+        if (cases?.TraceLevelName?.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false)
+            return true;
+        if (cases?.SubjectName?.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false)
+            return true;
+        if (cases?.Fee?.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false)
+            return true;
+        if (cases?.ClientName?.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false)
+            return true;
+        return false;
+    }
+
+    private async Task OpenManageCaseDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<ManageCase>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageCase>("Case", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetCases();
+        }
+    }
+
+
+    private async Task OpenManageSubjectDialog(Guid? subjectId, Guid? caseId, CaseStatusType caseStatus)
+    {
+        var parameters = new DialogParameters<ManageSubjects>();
+        parameters.Add(x => x.Id, subjectId);
+        parameters.Add(x => x.CaseId, caseId);
+        parameters.Add(x => x.CaseStatus, caseStatus);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageSubjects>("Subjects", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetCases();
+        }
+    }
+
+    private async Task RemoveCase(Guid id)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this case record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            var getcase = await CaseService.GetCasesByIdAsync(id);
+            var subjectId = getcase?.SubjectId;
+            if (subjectId != null)
+            {
+                var file = await CaseService.GetCaseReportFile(id, subjectId);
+                if (file != null)
+                {
+                    var subId = file.Id;
+                    await CaseService.DeleteCaseReportFile(subId);
+                    await CaseService.DeleteCasesAsync(id);
+                }
+                else
+                {
+                    await CaseService.DeleteCasesAsync(id);
+                }
+
+            }
+            else
+            {
+                await CaseService.DeleteCasesAsync(id);
+            }
+            await GetCases();
+            Snackbar.Add($"Successfully removed case.", Severity.Success);
+        }
+    }
+
+    // private async Task ExportCaseDataCsv()
+    // {
+    //     _cases = await CaseService.GetAllCasesAsync();
+    //     string csvFilePath = "elvis_Case.csv";
+    //     string FilePath = await ExportToCsv(csvFilePath, _cases);
+    //     await JS.InvokeVoidAsync("downloadFile", FilePath, "elvis_Case.csv");
+    // }
+
+    private async Task GetAuthorization()
+    {
+        var authorizationUrl = await QuickbookAuthorization();
+        NavigationManager.NavigateTo(authorizationUrl);
+
+    }
+
+    public async Task<string> QuickbookAuthorization()
+    {
+        // Construct the authorization URL with scope and state
+        var authorizationEndpoint = "https://appcenter.intuit.com/connect/oauth2";
+        var scope = "com.intuit.quickbooks.accounting";
+        var state = Guid.NewGuid().ToString(); // Generate a unique state value
+        var redirectUri = QuickbookConst.RedirectURI; // Your callback URL
+
+        var queryParams = $"client_id={QuickbookConst.ClientID}&response_type=code&redirect_uri={Uri.EscapeDataString(redirectUri)}&scope={Uri.EscapeDataString(scope)}&state={Uri.EscapeDataString(state)}";
+
+        var authorizationUrl = $"{authorizationEndpoint}?{queryParams}&realmId=9341452129604540";
+        return authorizationUrl;
+    }
+
+    public async Task<string> GetAccessToken(string authorizationCode)
+    {
+        // Construct the token endpoint URL
+        var tokenEndpoint = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
+
+        // Prepare the token request parameters
+        var tokenParams = new Dictionary<string, string>
+       {
+           { "grant_type", "authorization_code" },
+           { "code", authorizationCode },
+           { "redirect_uri", QuickbookConst.RedirectURI },
+           { "client_id", QuickbookConst.ClientID },
+           { "client_secret", QuickbookConst.ClientSecret }
+       };
+
+        // Make a POST request to the token endpoint to exchange the authorization code for an access token
+        using (var httpClient = new HttpClient())
+        {
+            var tokenResponse = await httpClient.PostAsync(tokenEndpoint, new FormUrlEncodedContent(tokenParams));
+            var tokenContent = await tokenResponse.Content.ReadAsStringAsync();
+            // Handle the token response
+            var tokenJson = JObject.Parse(tokenContent);
+            var accessToken = tokenJson.Value<string>("access_token");
+
+            return accessToken;
+            Console.WriteLine("Token response:");
+            Console.WriteLine(tokenContent);
+        }
+    }
+
+
+
+    public async Task CreateCustomers(string accessToken)
+    {
+        try
+        {
+            cases = (await CaseService.GetCasesIsNotSynced()).ToList();
+            if (cases.Count != 0)
+            {
+                var apiUrl = "https://sandbox-quickbooks.api.intuit.com/v3/company/9341452129604540/customer"; // POST API Url
+                string companyId = "9341452129604540";
+                var getapiUrl = $"https://sandbox-quickbooks.api.intuit.com/v3/company/{companyId}/query?query=SELECT * FROM Customer"; // Get API Url
+                using (var httpClient = new HttpClient())
+                {
+                    // Set authorization header with the access token
+                    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                    // Set content type header
+                    httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    foreach (var uploadcase in cases)
+                    {
+                        // Create the main company
+                        var companyData = new
+                        {
+                            DisplayName = uploadcase.CompanyName,
+                            GivenName = uploadcase.CompanyName,
+                            FamilyName = "",
+                            Balance = 0,
+                            BillAddr = new
+                            {
+                                Line1 = uploadcase.ClientAddress
+                            },
+                            PrimaryEmailAddr = new
+                            {
+                                Address = uploadcase.ClientEmail
+                            },
+                            PrimaryPhone = new
+                            {
+                                FreeFormNumber = uploadcase.ClientTelephoneNo
+                            },
+                            CompanyName = uploadcase.CompanyName
+                        };
+
+                        var companyJson = JsonConvert.SerializeObject(companyData);
+                        var httpContents = new StringContent(companyJson, Encoding.UTF8, "application/json");
+                        var companyResponse = await httpClient.PostAsync(apiUrl, httpContents); // Create Mani Comapny API
+                        if (companyResponse.IsSuccessStatusCode)
+                        {
+                            var companyResponseBody = await companyResponse.Content.ReadAsStringAsync();
+                            // Snackbar.Add("Company created successfully:");
+                            //Console.WriteLine(companyResponseBody);
+                        }
+                        else
+                        {
+                            // Console.WriteLine($"Already Company Created");
+                            //Console.WriteLine(companyResponse.ReasonPhrase);
+                            // continue; // Skip to next case
+                        }
+                        var getresponse = await httpClient.GetAsync(getapiUrl); // Customer Get API
+                        string getResponseBody = "";
+                        if (getresponse.IsSuccessStatusCode)
+                        {
+                            getResponseBody = await getresponse.Content.ReadAsStringAsync();
+                        }
+                        dynamic customers = JsonConvert.DeserializeObject(getResponseBody);
+                        bool companyExists = false;
+                        dynamic existingCompany = null;
+                        foreach (var customer in customers.QueryResponse.Customer)
+                        {
+                            if (customer.DisplayName == uploadcase.CompanyName)
+                            {
+                                //Exists company check
+                                companyExists = true;
+                                existingCompany = customer;
+                                break;
+                            }
+                        }
+                        if (companyExists == true)
+                        {
+                            // create sub-customer
+                            var customerData = new
+                            {
+                                DisplayName = uploadcase.ClientName,
+                                GivenName = uploadcase.ClientName,
+                                FamilyName = "",
+                                Balance = uploadcase.Fee,
+                                BillAddr = new
+                                {
+                                    Line1 = uploadcase.ClientAddress
+                                },
+                                PrimaryEmailAddr = new
+                                {
+                                    Address = uploadcase.ClientEmail
+                                },
+                                PrimaryPhone = new
+                                {
+                                    FreeFormNumber = uploadcase.ClientTelephoneNo
+                                },
+                                CompanyName = uploadcase.CompanyName,
+                                ParentRef = new
+                                {
+                                    value = existingCompany.Id
+                                },
+                                Job = true
+                            };
+                            var customerJson = JsonConvert.SerializeObject(customerData);
+                            var httpContent = new StringContent(customerJson, Encoding.UTF8, "application/json");
+                            var response = await httpClient.PostAsync(apiUrl, httpContent); // Post Sub-customer API
+                            if (response.IsSuccessStatusCode)
+                            {
+                                var responseBody = await response.Content.ReadAsStringAsync();
+                                //Snackbar.Add("Customer created successfully:");
+                                //Console.WriteLine(responseBody);
+                                uploadcase.IsSynced = true;
+                                await CaseService.UpdateCasesAsync(uploadcase);
+                                await Task.Delay(2000);
+                                Snackbar.Add($"Cases Synced successfully on QuickBooks", Severity.Success);
+                            }
+                            else
+                            {
+                                Snackbar.Add($" Cases have been already Synced ", Severity.Success);
+                                //Snackbar.Add(response.ReasonPhrase);
+                            }
+                        }
+                    }
+                    //Snackbar.Add($"Cases Synced successfully on QuickBooks", Severity.Success);
+                }
+            }
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred: {ex.Message}");
+        }
+    }
+
+    private async Task ExportCaseDataCsv(int tab)
+    {
+        IEnumerable<CaseViewModel> CasesToExport;
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            CasesToExport = _cases.Where(Case => FilterFunc(Case, _searchString));
+        }
+        else if(tab ==1)
+        {
+            var cases = _cases;
+            var filterCase = cases.ToList();
+            CasesToExport = filterCase;
+        }
+        else if(tab == 2)
+        {
+            var mycase = _mycase;
+            var filterCase = mycase.ToList();
+            CasesToExport = filterCase;
+        }
+        else
+        {
+            var caseList = await CaseService.GetAllCasesAsync();
+            CasesToExport = caseList;
+        }
+        string csvFilePath = "elvis_Cases.csv";
+        string FilePath = await ExportToCsv(csvFilePath, CasesToExport);
+        await JS.InvokeVoidAsync("downloadFile", FilePath, "elvis_Cases.csv");
+    }
+
+    private async Task<string> ExportToCsv(string filePath, IEnumerable<CaseViewModel> casesView)
+    {
+        DataTable dataTable = new DataTable();
+        dataTable.Columns.Add("CaseNumber", typeof(string));
+        dataTable.Columns.Add("Created", typeof(string));
+        dataTable.Columns.Add("TraceLevelName", typeof(string));
+        dataTable.Columns.Add("SubjectName", typeof(string));
+        dataTable.Columns.Add("Status", typeof(string));
+        dataTable.Columns.Add("Fee", typeof(string));
+        dataTable.Columns.Add("CompanyName", typeof(string));
+        dataTable.Columns.Add("CreatedBy", typeof(string));
+
+        foreach (var cases in casesView)
+        {
+            dataTable.Rows.Add(
+                cases.CaseNumber,
+                cases.Created,
+                cases.TraceLevelName,
+                cases.SubjectName,
+                GetStatusName(cases.Status),
+                cases.Fee,
+                cases.CompanyName,
+                cases.CreatedByName
+            );
+        }
+        return DataTableToString(dataTable);
+    }
+    public string GetStatusName(byte? status)
+    {
+        if (status.HasValue)
+        {
+            int statusValue = status.Value; // Convert byte? to int
+            if (Enum.IsDefined(typeof(CaseStatusType), statusValue))
+            {
+                CaseStatusType statusType = (CaseStatusType)statusValue;
+                return statusType.ToString();
+            }
+        }
+        return "Unknown";
+    }
+
+    private string DataTableToString(DataTable dataTable)
+    {
+        StringBuilder sb = new StringBuilder();
+        foreach (DataColumn column in dataTable.Columns)
+        {
+            sb.Append(column.ColumnName);
+            sb.Append(",");
+        }
+        sb.AppendLine();
+        foreach (DataRow row in dataTable.Rows)
+        {
+            foreach (var item in row.ItemArray)
+            {
+                sb.Append(item);
+                sb.Append(",");
+            }
+            sb.AppendLine();
+        }
+        return sb.ToString();
+    }
+
+    private async Task OpenManageAgentCaseDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<ManageAgentCase>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageAgentCase>("Case Update", parameters, options).Result;
+
+        if (!result.Canceled && result.Data != null)
+        {
+            await GetSubjects();
+        }
+        StateHasChanged();
+        await GetSubjects();
+
+    }
+    private async Task GetSubjects()
+    {
+        _subjects = await SubjectService.GetAllSubjectsWithCaseByAgentAsync(_currentLoginUser.Id);
+    }
+
+    public async Task<CaseViewModel> DownloadCaseReportFile(Guid? CaseId, Guid? SubjectId)
+    {
+        var CaseReportFile = await CaseService.GetCaseReportFile(CaseId, SubjectId);
+        var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "UploadedDocument");
+        var filePath = Path.Combine(uploadsFolder, CaseReportFile.FilePath);
+        var fileUrl = $"/UploadedDocument/{CaseReportFile.FilePath}";
+        await JS.InvokeVoidAsync("downloadPdfFile", fileUrl);
+
+        return null;
+    }
+}

@@ -1,0 +1,107 @@
+﻿@using CaseManagementSystem.Data.Auth;
+@inherits LayoutComponentBase
+
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<MudThemeProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+
+
+<PageTitle>Case Management System</PageTitle>
+
+<MudLayout>
+    @if (IsLoginPage())
+    {
+        <MudContainer Class="mt-6">
+            @Body
+        </MudContainer>
+    }
+    else
+    {
+        <MudAppBar Elevation="1"  style="background-color: white;box-shadow:none;">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Dark" Edge="Edge.Start" OnClick="@ToggleDrawer" />
+            <MudSpacer />
+            <MudButton id="HiddenBtnLogOut" OnClick="LogoutUser" Style="display:none"></MudButton>
+            <div class="justify-content-end">
+                <MudIconButton Style="color:#774991 " Icon="@Icons.Material.Filled.AccountCircle" OnClick="UserProfile">Profile</MudIconButton>
+                <MudIconButton Style="color:#774991 " Icon="@Icons.Material.Filled.Lock" OnClick="ChangePassword">Change Password</MudIconButton>
+                <MudIconButton Style="color:#774991 " Icon="@Icons.Material.Filled.ExitToApp" OnClick="LogoutUser">Logout</MudIconButton>
+
+            </div>
+
+        </MudAppBar>
+        <MudDrawer @bind-Open="@open" Elevation="1">
+            <MudDrawerHeader>
+                <img src="..\logo.png" style="width: 200px;" alt="Your CMS Logo">
+            </MudDrawerHeader>
+
+            <NavMenu />
+
+        </MudDrawer>
+        <MudMainContent Class="pt-16 px-1 px-xl-16" Style="background:#f9f9f9">
+            <MudContainer Class="mt-6">
+                @Body
+            </MudContainer>
+        </MudMainContent>
+    }
+</MudLayout>
+
+@code {
+    bool open = true;
+
+    private void ToggleDrawer()
+    {
+        open = !open;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsLoginPage() == false && CustomAuthenticationStateProvider.IsAuthenticated() == false)
+        {
+            NavigationManager.NavigateTo("/login");
+        }
+    }
+
+    private bool IsLoginPage()
+    {
+        string uri = NavigationManager.Uri;
+
+        // Check if the URI contains "/login" or is equal to the base URI.
+        if (uri.ToLower().Contains("/login")
+            || uri == NavigationManager.BaseUri
+            || uri.ToLower().Contains("/forgot-password")
+            || uri.ToLower().Contains("/reset-password"))
+        {
+            return true;
+        }
+
+        // Split the URI by '/' character.
+        string[] parts = uri.Split('/');
+
+        // Check if there are at least 4 parts and none of the parts are empty or whitespace.
+        if (parts.Length >= 4 && parts.Skip(3).Any(part => !string.IsNullOrWhiteSpace(part)))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private void UserProfile()
+    {
+        NavigationManager.NavigateTo("/profile");
+    }
+
+    private void ChangePassword()
+    {
+        NavigationManager.NavigateTo("/password");
+    }
+    private async Task LogoutUser()
+    {
+        await CustomAuthenticationStateProvider.LogoutUserAsync();
+        NavigationManager.NavigateTo("/");
+    }
+}

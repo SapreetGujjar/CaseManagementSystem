@@ -1,0 +1,239 @@
+﻿@page "/"
+@page "/login"
+@page "/login/{caseId?}"
+
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Users;
+@using CaseManagementSystem.Helpers
+@inject IJSRuntime JS;
+@inject UsersService UsersService
+@inject NavigationManager NavigationManager
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject ICryptoService CryptoServices
+<div class="d-flex ">
+    <!--begin::Page bg image-->
+    <style>
+        body {
+            background-image: url('https://standfirst-interconnectit-production-2019.imgix.net/uploads/2023/07/vackground-com-DolX86gepFw-unsplash.jpg?auto=compress,format&crop=faces,entropy,edges&fit=crop&q=75&w=1200&h=500');
+            background-position: fixed;
+            background-size: cover;
+            background-repeat: none;
+            display: flex;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .card-body {
+            display: flex;
+            align-item: center;
+            top: 50%;
+            left: 50%;
+            transform =translate(-50%,-50%;
+            );
+        }
+
+        .mud-input > input.mud-input-root {
+            padding: 20px 10px;
+            backgorund-color: #fff;
+        }
+
+        .mud-input-label-inputcontrol {
+            top: 0;
+            left: 0;
+            position: absolute;
+            transform: translate(0, 0px) scale(0.75);
+        }
+
+        .mud-button-filled.mud-button-filled-primary {
+            background-color: #774991 ;
+        }
+
+            .mud-button-filled.mud-button-filled-primary:hover, .mud-button-filled.mud-button-filled-primary:focus-visible {
+                background-color: #995FBA ;
+            }
+
+    </style>
+    <!--end::Page bg image-->
+    <!--begin::Authentication - Sign-in -->
+    <div class=" card-body d-flex flex-column  justify-content-between flex-column-fluid flex-lg-row align-center">
+        <!--begin::Aside-->
+        <div class="d-flex flex-center w-lg-50 pt-15 pt-lg-0 px-10">
+            <!--begin::Aside-->
+            <div class="d-flex flex-center flex-lg-start flex-column">
+                <!--begin::Logo-->
+                <p class="mb-7">
+                    <img alt="Logo" src="..\logo.png">
+                </p>
+                <!--end::Logo-->
+                <!--begin::Title-->
+                <!--end::Title-->
+            </div>
+            <!--begin::Aside-->
+        </div>
+        <!--begin::Aside-->
+        <!--begin::Body-->
+        <div class="d-flex flex-column-fluid flex-lg-row-auto justify-content-center justify-content-lg-end p-12 p-lg-20">
+            <!--begin::Card-->
+            <div class="bg-body d-flex flex-column align-items-stretch flex-center  w-md-600px p-20">
+                <!--begin::Wrapper-->
+                <div class="d-flex flex-center flex-column flex-column-fluid px-lg-10  pb-15 pb-lg-20" style="width:600px;">
+                    <!--begin::Form-->
+                    <MudCard class="rounded-xl">
+
+                        <div class="mud-grid-item mud-grid-item-sm- align-center mud-elevation-25 pa-15 ">
+                            <MudForm @ref="_form">
+                                <MudCardContent>
+                                    <MudText class="text-center py-8" Typo="Typo.h5">Login</MudText>
+                                    <MudTextField class="pt-2" T="string" @bind-Value="_username" Label="Username" Required="true" RequiredError="User name is required!" />
+                                    <MudTextField T="string" @bind-Value="_password" Label="Password" InputType="InputType.Password" Required="true" RequiredError="Password is required!" />
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Error">@_errorMessage</MudText>
+                                    <MudLink @onclick="@(() => ForgotPassword())" Class="mt-2">Forgot Password</MudLink>
+
+                                </MudCardContent>
+                            </MudForm>
+                            <MudItem class="text-center px-4 ">
+                                <div class="d-flex align-items-center mt-2 ml-2">
+                                    <MudCheckBox Size="Size.Small" T="bool" @bind-Checked="@agreed" class="mr-2" />
+                                    <div class="mt-2">
+                                        <a class="cursor-pointer" style="display: inline;" @onclick="@(() => OpenPDF())"><span>I Agree to </span></a>
+                                        <MudLink @onclick="@(() => OpenPDF())">Terms & Conditions</MudLink>
+                                    </div>
+
+
+                                </div>
+                            </MudItem>
+                            <MudCardActions class="text-center py-4 px-4">
+                                <div class="d-flex justify-content-center align-items-center mb-4">
+                                    <MudButton Disabled="!agreed" Variant="Variant.Filled" Color="Color.Primary" OnClick="HandleLogin" class="mr-2">Login</MudButton>
+                                </div>
+                            </MudCardActions>
+
+                        </div>
+                    </MudCard>
+                    <!--end::Form-->
+                </div>
+                <!--end::Wrapper-->
+
+            </div>
+            <!--end::Card-->
+        </div>
+        <!--end::Body-->
+    </div>
+    <!--end::Authentication - Sign-in-->
+</div>
+
+
+
+@code {
+    [ParameterAttribute]
+    public string? caseId { get; set; }
+
+    private string _username;
+    private string _password;
+    private string _errorMessage;
+    private string _caseId;
+    MudForm _form;
+
+    private bool agreed { get; set; } = false;
+
+
+    protected void OnGet(string caseId = null)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // If there is a Case Id, try to parse its value to determinate if it's valid
+        if (caseId != null)
+        {
+            try
+            {
+                string decCaseId = CryptoServices.DecryptStringEscaped(caseId);
+                Guid newCaseId = new Guid(decCaseId);
+            }
+            catch (Exception ex)
+            {
+                // received case Id is invalid, set it to null
+                caseId = null;
+            }
+        }
+
+        //if (CustomAuthenticationStateProvider.IsAuthenticated())
+        //{
+
+        //    string url = NavigationManager.Uri;
+        //    string[] segments = url.Split('/');
+        //    string lastSegment = segments[segments.Length - 1];
+
+
+        //    if (caseId == null)
+        //    {
+        //        NavigationManager.NavigateTo("/index");
+        //    }else if(lastSegment != null)
+        //    {
+        //        NavigationManager.NavigateTo("/cases/" + lastSegment);
+        //    }
+        //        else
+        //    {
+
+        //        if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+        //            NavigationManager.NavigateTo("/agentcase/" + caseId);
+        //        else
+        //            NavigationManager.NavigateTo("/cases/" + caseId);
+        //    }
+        //}
+    }
+
+    private async Task ForgotPassword()
+    {
+        NavigationManager.NavigateTo("/forgot-password");
+    }
+    async Task OpenPDF()
+    {
+            await JS.InvokeVoidAsync("openInNewTab", "/Get_Started_With_Smallpdf.pdf");
+        
+    }
+    private async Task HandleLogin()
+    {
+
+        string url = NavigationManager.Uri;
+        string[] segments = url.Split('/');
+        string lastSegment = segments[segments.Length - 1];
+
+        if (agreed)
+        {
+            await _form.Validate();
+
+            if (_form.IsValid)
+            {
+                UsersViewModel user = await UsersService.CheckLogin(_username);
+
+                if (user != null && user.Password == _password)
+                {
+                    await CustomAuthenticationStateProvider.AuthenticateUserAsync(user.EmailAddress, user.GetRoleTypeName());
+                    await UsersService.UpdateUsersLastLoginAsync(user.Id);
+
+                    if (lastSegment == "" || lastSegment == "login")
+                        NavigationManager.NavigateTo("/index");
+                    else if (lastSegment != "login")
+                    {
+
+                        if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+                            NavigationManager.NavigateTo("/agentcase?Status=" + lastSegment);
+                        else
+                            NavigationManager.NavigateTo("/cases?caseId=" + lastSegment);
+                    }
+                }
+                else
+                {
+                    _errorMessage = "Invalid username or password.";
+                }
+            }
+            else
+            {
+                _errorMessage = "Please agree to the Terms and Conditions.";
+
+            }
+        }
+    }
+}

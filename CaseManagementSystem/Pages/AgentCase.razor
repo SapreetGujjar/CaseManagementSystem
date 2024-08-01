@@ -1,0 +1,415 @@
+﻿@page "/agentcase"
+@page "/agentcase/{caseId?}"
+
+@using CMS.DL.Model
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Subjects;
+@using CaseManagementSystem.Data.Users;
+@using CaseManagementSystem.Data.Cases;
+@using CaseManagementSystem.Data.Enum;
+@using CaseManagementSystem.Helpers
+
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject CaseService CaseService
+@inject NavigationManager NavigationManager
+@inject UsersService UsersService
+@inject SubjectService SubjectService
+@inject IDialogService Dialog
+@inject ISnackbar Snackbar
+@inject ICryptoService CryptoServices
+
+<style>
+    .company-list-th {
+        color: #5c6479 !important;
+        font-size: 13px;
+    }
+
+    thead tr td {
+        width: 25%;
+    }
+
+    .form-control .mud-input-control {
+        display: block;
+        width: 100%;
+        padding: 0.3rem 1rem;
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #5c6479;
+        appearance: none;
+        background-color: #5c64791f;
+        background-clip: padding-box;
+        border: 1px solid #5c647936;
+        border-radius: 0.475rem;
+        box-shadow: false;
+        transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    }
+
+    .customInputwidth {
+        width: 320px;
+    }
+
+    .export-btn {
+        position: relative;
+    }
+
+    .mud-input.mud-input-underline:before {
+        border-bottom: 0px
+    }
+
+    .mud-input-control > .mud-input-control-input-container > div.mud-input.mud-input-text {
+        margin-top: 0px;
+    }
+
+    .mud-table-root {
+        padding-top: 8px;
+    }
+
+    .mud-table-cell {
+        font-size: 12px;
+    }
+
+    .mud-table-toolbar {
+        position: relative;
+        flex-wrap: wrap;
+        row-gap: 12px;
+        height: 100%;
+        width: 100%;
+    }
+
+    .mud-button-filled.mud-button-filled-primary {
+        background-color: #774991 !important;
+    }
+
+        .mud-button-filled.mud-button-filled-primary:hover, .mud-button-filled.mud-button-filled-primary:focus-visible {
+            background-color: #995FBA !important;
+        }
+
+    .mud-primary-text {
+        color: #774991 !important;
+    }
+
+    .text-nowrap {
+        white-space: nowrap
+    }
+
+    .text-wrap-pretty {
+        text-wrap: pretty;
+        width: 140px;
+    }
+
+    .theadBG {
+        background: #e8edf1 !important
+    }
+</style>
+
+<PageTitle>Case</PageTitle>
+<MudText Typo="Typo.h5" Class="mb-2"><b>Case</b></MudText>
+<MudTabs Elevation="2" class="tab-btn" AlwaysShowScrollButtons="true" Rounded="true" PrevIcon="@Icons.Material.Filled.SkipPrevious" NextIcon="@Icons.Material.Filled.SkipNext" ApplyEffectsToContainer="true" PanelClass="">
+
+<MudTabPanel Text="All Cases">
+
+        <MudTable Items="@_subjectsAll" Hover="true" Filter="new Func<SubjectViewModel,bool>(FilterFuncCallBack)" AllowUnsorted="false" @bind-SelectedItem="_selectedItem">
+        <ToolBarContent>
+            <div class="form-control customInputwidth pb-2 pt-3">
+                <MudTextField style="margin-top:0px;" @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </div>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh class="theadBG"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<SubjectViewModel, object>(x=>x.CaseNumber)" Class="text-nowrap">Case #</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.FirstName)">Firstname</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.LastName)">Lastname</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.Email)">Email</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.TelephoneNumber)" Class="text-nowrap">Telephone Number</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.Addresses)" Style="min-width: 340px">Addresses</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.CaseStatus)">Status</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG">View Job</MudTh>
+            <MudTh class="theadBG">View Subject</MudTh>
+
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="CaseNumber">@context.CaseNumber</MudTd>
+            <MudTd DataLabel="Firstname">@context.FirstName</MudTd>
+            <MudTd DataLabel="Lastname">@context.LastName</MudTd>
+            <MudTd DataLabel="Email">@context.Email</MudTd>
+            <MudTd DataLabel="Telephone Number">@context.TelephoneNumber</MudTd>
+            <MudTd DataLabel="Address1"> <span Class="text-nowrap text-wrap-pretty">@context.Addresses</span></MudTd>
+            <MudTd DataLabel="Status">
+                @(((CaseStatusType)(context.CaseStatus ?? 1)).ToString())
+            </MudTd>
+            <MudTd DataLabel="View Job">
+                <MudTooltip Text="View Job" Color="Color.Primary" Placement="Placement.Top">
+                    @*
+                    <MudButton Variant="Variant.Filled" OnClick="@((e) => OpenManageAgentCaseDialog(@context.CaseId))" Class="text-nowrap mud-button-root mud-button mud-button-filled mud-button-filled-primary mud-button-filled-size-medium mud-ripple">View Job</MudButton>
+                    *@
+                    <MudIconButton Icon="fas fa-eye" Color="Color.Primary" OnClick="@((e) => OpenManageAgentCaseDialog(@context.CaseId))"></MudIconButton>
+                </MudTooltip>
+
+            </MudTd>
+            <MudTd DataLabel="View Subject" style="padding: 0; margin: 0;">
+                @if (context.Id != null)
+                {
+                    <MudTooltip Text="View Subject" Color="Color.Primary" Placement="Placement.Top">
+                        <MudIconButton Icon="@Icons.Material.Filled.Person" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageSubjectDialog(context.Id, @context.CaseId, (CaseStatusType)(@context.CaseStatus ?? 1)))"></MudIconButton>
+                    </MudTooltip>
+                }
+            </MudTd>
+
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudTabPanel>
+
+    <MudTabPanel Text="My Cases">
+
+    <MudTable Items="@_subjects" Hover="true" AllowUnsorted="false" Filter="new Func<SubjectViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+        <ToolBarContent>
+            <div class="form-control customInputwidth pb-2 pt-3">
+                <MudTextField style="margin-top:0px;" @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </div>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh class="theadBG"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<SubjectViewModel, object>(x=>x.CaseNumber)" Class="text-nowrap">Case #</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.FirstName)">Firstname</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.LastName)">Lastname</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.Email)">Email</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.TelephoneNumber)" Class="text-nowrap">Telephone Number</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.Addresses)" Style="min-width: 340px">Addresses</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG"><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.CaseStatus)">Status</MudTableSortLabel></MudTh>
+            <MudTh class="theadBG">View Job</MudTh>
+            <MudTh class="theadBG">View Subject</MudTh>
+
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="CaseNumber">@context.CaseNumber</MudTd>
+            <MudTd DataLabel="Firstname">@context.FirstName</MudTd>
+            <MudTd DataLabel="Lastname">@context.LastName</MudTd>
+            <MudTd DataLabel="Email">@context.Email</MudTd>
+            <MudTd DataLabel="Telephone Number">@context.TelephoneNumber</MudTd>
+            <MudTd DataLabel="Address1"> <span Class="text-nowrap text-wrap-pretty">@context.Addresses</span></MudTd>
+            <MudTd DataLabel="Status">
+                @(((CaseStatusType)(context.CaseStatus ?? 1)).ToString())
+            </MudTd>
+            <MudTd DataLabel="View Job">
+                <MudTooltip Text="View Job" Color="Color.Primary" Placement="Placement.Top">
+                    @*
+                    <MudButton Variant="Variant.Filled" OnClick="@((e) => OpenManageAgentCaseDialog(@context.CaseId))" Class="text-nowrap mud-button-root mud-button mud-button-filled mud-button-filled-primary mud-button-filled-size-medium mud-ripple">View Job</MudButton>
+                    *@
+                    <MudIconButton Icon="fas fa-eye" Color="Color.Primary" OnClick="@((e) => OpenManageAgentCaseDialog(@context.CaseId))"></MudIconButton>
+                </MudTooltip>
+
+            </MudTd>
+            <MudTd DataLabel="View Subject" style="padding: 0; margin: 0;">
+                @if (context.Id != null)
+                {
+                    <MudTooltip Text="View Subject" Color="Color.Primary" Placement="Placement.Top">
+                        <MudIconButton Icon="@Icons.Material.Filled.Person" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => OpenManageSubjectDialog(context.Id, @context.CaseId, (CaseStatusType)(@context.CaseStatus ?? 1)))"></MudIconButton>
+                    </MudTooltip>
+                }
+            </MudTd>
+
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+
+</MudTabPanel> 
+</MudTabs>
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [ParameterAttribute]
+    public string? caseId { get; set; }
+    public string? Status { get; set; }
+
+    private SubjectViewModel _selectedItem = null;
+    private IEnumerable<SubjectViewModel> _subjects = new List<SubjectViewModel>();
+    private string _searchString = "";
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+    private IEnumerable<SubjectViewModel> _subjectsAll = new List<SubjectViewModel>();
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CustomAuthenticationStateProvider.IsAuthenticated())
+        {
+            NavigationManager.NavigateTo("/");
+        }
+
+        if (CustomAuthenticationStateProvider.RoleType() != "Agent" && CustomAuthenticationStateProvider.RoleType() != "Internal")
+        {
+            NavigationManager.NavigateTo("/index");
+        }
+
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+        await GetSubjects();
+        await GetAllCase();
+        string url = NavigationManager.Uri;
+        string[] segments = url.Split('=');
+        string Status = segments[segments.Length - 1];
+        if (Status == "2" || Status == "5" || Status == "7")
+        {
+            await GetCasesStatusList(Status);
+        }
+    }
+
+    private async Task GetCasesStatusList(string id)
+    {
+        var caselist = await SubjectService.GetAllSubjectsWithCaseByAgentAsync(_currentLoginUser.Id);
+        byte? byteValue = byte.Parse(id);
+        _subjects = caselist.Where(x => x.CaseStatus == byteValue).ToList(); 
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender == true)
+        {
+            // If there is a Case Id, try to parse its value to determinate if it's valid
+            if (caseId != null)
+            {
+                try
+                {
+                    string decCaseId = CryptoServices.DecryptStringEscaped(caseId);
+                    Guid newCaseId = new Guid(decCaseId);
+
+                    CaseViewModel caseViewModel = await CaseService.GetCasesByIdAsync(newCaseId);
+                    if (caseViewModel != null)
+                    {
+                        await OpenManageAgentCaseDialog(newCaseId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // received case Id is invalid, set it to null
+                    caseId = null;
+                }
+            }
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task GetAllCase()
+    {
+        _subjectsAll = await SubjectService.GetAllSubjectsWithCasetAsync(_currentLoginUser.Id);
+    }
+    private async Task GetSubjects()
+    {
+        _subjects = await SubjectService.GetAllSubjectsWithCaseByAgentAsync(_currentLoginUser.Id);
+    }
+
+    private bool FilterFuncCallBack(SubjectViewModel subject) => FilterFunc(subject, _searchString);
+
+    private bool FilterFunc(SubjectViewModel subject, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if ((subject?.CaseNumber?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false))
+            return true;
+        if ((subject?.FirstName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((subject?.LastName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((subject?.Email?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((subject?.TelephoneNumber?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((subject?.CompanyName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((subject?.Addresses?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if (((CaseStatusType)(subject?.CaseStatus ?? 1)).ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+
+    private async Task OpenManageSubjectsDialog(Guid? Id, Guid? CaseId, CaseStatusType caseStatus)
+    {
+        var parameters = new DialogParameters<ManageSubjects>();
+        parameters.Add(x => x.Id, Id);
+        parameters.Add(x => x.CaseId, CaseId);
+        parameters.Add(x => x.CaseStatus, caseStatus);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageSubjects>("Subjects", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetSubjects();
+        }
+    }
+
+    private async Task OpenManageAgentCaseDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<ManageAgentCase>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageAgentCase>("Case Update", parameters, options).Result;
+
+        if (!result.Canceled && result.Data != null)
+        {
+            await GetSubjects();
+        }
+        StateHasChanged();
+        await GetSubjects();
+
+    }
+    private async Task CheckoutCase(Guid? Id)
+    {
+        try
+        {
+            CaseViewModel caseViewModel = await CaseService.GetCasesByIdAsync((Guid)Id);
+            if (caseViewModel != null)
+            {
+                caseViewModel.Updated = DateTime.UtcNow;
+                caseViewModel.UpdatedBy = _currentLoginUser.Id;
+                caseViewModel.Status = (byte?)CaseStatusType.CHECKEDOUT;
+                caseViewModel.EndClient = _currentLoginUser.Id;
+                await CaseService.UpdateCasesAsync(caseViewModel);
+            }
+            await GetSubjects();
+            Snackbar.Add("Successfully saved Case information.", Severity.Success);
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Error! Please try again.", Severity.Error);
+        }
+    }
+    private async Task OpenManageSubjectDialog(Guid? subjectId, Guid? caseId, CaseStatusType caseStatus)
+    {
+        var parameters = new DialogParameters<ManageSubjects>();
+        parameters.Add(x => x.Id, subjectId);
+        parameters.Add(x => x.CaseId, caseId);
+        parameters.Add(x => x.CaseStatus, caseStatus);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageSubjects>("Subjects", parameters, options).Result;
+
+       
+    }
+    // private async Task GetCases()
+    // {
+    //     if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+    //     {
+    //         _cases = await CaseService.GetAllCasesAsync();
+    //     }
+    //     else if (CustomAuthenticationStateProvider.RoleType() == "Client")
+    //     {
+
+    //         _cases = await CaseService.GetCasesByClientAsync(_currentLoginUser.Id);
+
+    //     }
+    //     if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+    //     {
+    //         _cases = await CaseService.GetAllCasesAsync();
+    //     }
+    //     if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+    //     {
+    //         _subjects = await SubjectService.GetAllSubjectsWithCaseByAgentAsync(_currentLoginUser.Id);
+    //     }
+    // }
+}

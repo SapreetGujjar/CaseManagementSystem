@@ -1,0 +1,213 @@
+﻿@page "/tracelevel"
+
+@using System.Net.Http.Json
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.TraceLevels
+@using System.Net;
+
+@inject IDialogService Dialog
+@inject TraceLevelService TraceLevelService
+@inject ISnackbar Snackbar
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+
+<style>
+    .form-control .mud-input-control {
+        display: block;
+        width: 100%;
+        padding: 0.3rem 1rem;
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #5c6479;
+        appearance: none;
+        background-color: #5c64791f;
+        background-clip: padding-box;
+        border: 1px solid #5c647936;
+        border-radius: 0.475rem;
+        box-shadow: false;
+        transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    }
+
+    .mud-input-control > .mud-input-control-input-container > div.mud-input.mud-input-text {
+        margin-top: 0px;
+    }
+
+    .mud-input.mud-input-underline:before {
+        border-bottom: 0px
+    }
+
+    .mud-table-cell {
+        font-size: 12px;
+    }
+
+    .mud-table-root {
+        padding-top: 8px;
+    }
+
+
+    .mud-button-filled.mud-button-filled-primary {
+        background-color: #774991 !important;
+    }
+
+        .mud-button-filled.mud-button-filled-primary:hover, .mud-button-filled.mud-button-filled-primary:focus-visible {
+            background-color: #995FBA !important;
+        }
+
+    .mud-primary-text {
+        color: #774991 !important;
+    }
+</style>
+
+<PageTitle> Trace Level</PageTitle>
+
+
+<MudText Typo="Typo.h5" Class="mb-2"><b>Trace Level</b></MudText>
+
+
+<MudTable Items="@_traceLevel" Hover="true" Filter="new Func<TraceLevelViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+    <ToolBarContent>
+        <div class="d-flex justify-space-between flex-grow-1 align-items-center">
+            <div class="form-control">
+                <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </div>
+
+            <div class="d-flex align-content-center justify-end mb-2 me-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OPenManageTraceLevelDialog(null))">Create</MudButton>
+            </div>
+        </div>
+    </ToolBarContent>
+    <HeaderContent>
+
+        <MudTd>Name</MudTd>
+        <MudTd>Fee</MudTd>
+        <MudTd>Turnaround Time</MudTd>
+        <MudTd>Agent Cost</MudTd>
+        <MudTd>Description</MudTd>
+        <MudTd>Actions</MudTd>
+    </HeaderContent>
+    <RowTemplate>
+       
+        <MudTd DataLabel="Name">@context.Name</MudTd>
+        <MudTd DataLabel="Fee">@context.Fee</MudTd>
+        <MudTd DataLabel="TurnaroundTime">
+            @if (@context.TurnaroundTime == 1)
+            {
+                <div>1 Day</div>
+            }
+            else if (@context.TurnaroundTime == 2)
+            {
+                <div>1 Week</div>
+            }
+            else if (@context.TurnaroundTime == 3)
+            {
+                <div>1 Month</div>
+            }
+            else if (@context.TurnaroundTime == 4)
+            {
+                <div>1 Year</div>
+            }
+            else
+            {
+                <div></div>
+            }
+        </MudTd>
+        <MudTd DataLabel="AgentCost">@context.AgentCost</MudTd>
+        <MudTd DataLabel="Description">@context.Description</MudTd>
+        <MudTd Class="d-flex">
+        <MudTd DataLabel="Edit" Style="padding:0;border-bottom:0;">
+            <MudTooltip Text="Edit Case Type" Color="Color.Primary" Placement="Placement.Top">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OPenManageTraceLevelDialog(@context.Id))"></MudIconButton>
+            </MudTooltip>
+        </MudTd>
+            <MudTd DataLabel="Remove" Style="padding:0;border-bottom:0;">
+            <MudTooltip Text="Remove Case Type" Color="Color.Primary" Placement="Placement.Top">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveTraceLevel(@context.Id))"></MudIconButton>
+            </MudTooltip>
+            </MudTd>
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+
+@code {
+
+    private TraceLevelViewModel _selectedItem = null;
+    private IEnumerable<TraceLevelViewModel> _traceLevel = new List<TraceLevelViewModel>();
+    private string _searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CustomAuthenticationStateProvider.IsAuthenticated())
+        {
+            NavigationManager.NavigateTo("/");
+        }
+
+        if (CustomAuthenticationStateProvider.RoleType() == "Client" || CustomAuthenticationStateProvider.RoleType() == "Agent")
+        {
+            NavigationManager.NavigateTo("/index");
+        }
+
+        await GetTraceLevels();
+    }
+
+    private async Task GetTraceLevels()
+    {
+        _traceLevel = await TraceLevelService.GetAllTraceLevelsAsync();
+    }
+
+    private bool FilterFuncCallBack(TraceLevelViewModel traceLevel) => FilterFunc(traceLevel, _searchString);
+
+    private bool FilterFunc(TraceLevelViewModel traceLevel, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if ((traceLevel?.Name?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((traceLevel?.Fee.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((traceLevel?.TurnaroundTime.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((traceLevel?.AgentCost.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((traceLevel?.Description?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        return false;
+    }
+    private async Task OPenManageTraceLevelDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<ManageTraceLevel>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageTraceLevel>("Trace Level", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetTraceLevels();
+        }
+    }
+
+    private async Task RemoveTraceLevel(Guid id)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this trace level record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await TraceLevelService.DeleteTraceLevelAsync(id);
+            await GetTraceLevels();
+
+            Snackbar.Add($"Successfully removed trace level.", Severity.Success);
+        }
+    }
+}

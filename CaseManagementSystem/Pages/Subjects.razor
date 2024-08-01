@@ -1,0 +1,202 @@
+﻿@page "/subjects"
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Subjects;
+@using CaseManagementSystem.Data.Users;
+
+@inject IDialogService Dialog
+@inject UsersService UsersService
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+@inject SubjectService SubjectService
+
+
+<style>
+    .form-control .mud-input-control {
+        display: block;
+        width: 100%;
+        padding: 0.3rem 1rem;
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #5c6479;
+        appearance: none;
+        background-color: #5c64791f;
+        background-clip: padding-box;
+        border: 1px solid #5c647936;
+        border-radius: 0.475rem;
+        box-shadow: false;
+        transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    }
+
+    .mud-input-control > .mud-input-control-input-container > div.mud-input.mud-input-text {
+        margin-top: 0px;
+    }
+
+    .mud-input.mud-input-underline:before {
+        border-bottom: 0px
+    }
+
+    .mud-table-cell {
+        font-size: 12px;
+    }
+
+    .mud-table-root {
+        padding-top: 8px;
+    }
+
+    .mud-button-filled.mud-button-filled-primary {
+        background-color: #774991 !important;
+    }
+
+        .mud-button-filled.mud-button-filled-primary:hover, .mud-button-filled.mud-button-filled-primary:focus-visible {
+            background-color: #995FBA !important;
+        }
+
+    .mud-primary-text {
+        color: #774991 !important;
+    }
+</style>
+
+<PageTitle>Subjects</PageTitle>
+
+
+<MudText Typo="Typo.h5" Class="mb-2"><b>Subjects</b></MudText>
+
+<MudTable Items="@_subjects" Hover="true" AllowUnsorted="false" Filter="new Func<SubjectViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+    <ToolBarContent>
+        <div class="d-flex justify-space-between align-items-center flex-grow-1">
+            <div class="form-control ">
+            <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </div>
+            <div class="d-flex align-content-center justify-end mb-2 me-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OpenManageSubjectsDialog(null))">Create</MudButton>
+            </div>
+        </div>
+
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<SubjectViewModel, object>(x=>x.FirstName)">Firstname</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.LastName)">Lastname</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.Email)">Email</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.TelephoneNumber)">Telephone Number</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortBy="new Func<SubjectViewModel, object>(x=>x.Addresses)">Addresses</MudTableSortLabel></MudTh>
+        <MudTh>Actions</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+       
+        <MudTd DataLabel="Firstname">@context.FirstName</MudTd>
+        <MudTd DataLabel="Lastname">@context.LastName</MudTd>
+        <MudTd DataLabel="Email">@context.Email.Replace(";", ", ")</MudTd>
+        <MudTd DataLabel="Telephone Number">@context.TelephoneNumber</MudTd>
+        <MudTd DataLabel="Address1">@context.Addresses.Replace(";", ", ")</MudTd>
+        <MudTd Class="d-flex">
+            <MudTd DataLabel="Edit" Style="padding:0; border-bottom:0;">
+                <MudTooltip Text="Edit Subject" Color="Color.Primary" Placement="Placement.Top">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageSubjectsDialog(@context.Id))"></MudIconButton>
+                </MudTooltip>
+            </MudTd>
+            <MudTd DataLabel="Remove" Style="padding:0; border-bottom:0;">
+                <MudTooltip Text="Remove Subject" Color="Color.Primary" Placement="Placement.Top">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" aria-label="Remove" OnClick="@((e) => RemoveSubject(@context.Id))"></MudIconButton>
+                </MudTooltip>
+            </MudTd>
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private SubjectViewModel _selectedItem = null;
+    private IEnumerable<SubjectViewModel> _subjects = new List<SubjectViewModel>();
+    private string _searchString = "";
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CustomAuthenticationStateProvider.IsAuthenticated())
+        {
+            NavigationManager.NavigateTo("/");
+        }
+
+        if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+        {
+            NavigationManager.NavigateTo("/index");
+        }
+
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+        await GetSubjects();
+    }
+
+    private async Task GetSubjects()
+    {
+        if (CustomAuthenticationStateProvider.RoleType() == "InternalAdmin")
+        {
+            _subjects = await SubjectService.GetAllSubjectsWithCaseAsync();
+        }
+        else
+        {
+            _subjects = await SubjectService.GetSubjectsByClientAsync(_currentLoginUser.Id);
+        }
+    }
+
+    private bool FilterFuncCallBack(SubjectViewModel subject) => FilterFunc(subject, _searchString);
+
+    private bool FilterFunc(SubjectViewModel subject, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if ((subject?.FirstName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((subject?.LastName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((subject?.Email?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((subject?.TelephoneNumber?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((subject?.CompanyName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((subject?.Addresses?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((subject?.DateOfBirth?.ToShortDateString().Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+
+        return false;
+    }
+
+    private async Task OpenManageSubjectsDialog(Guid? Id)
+    {
+        var parameters = new DialogParameters<ManageUser>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageSubjects>("Subjects", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetSubjects();
+        }
+    }
+
+    private async Task RemoveSubject(Guid id)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to remove this subject record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await SubjectService.DeleteSubjectsAsync(id);
+            await GetSubjects();
+
+            Snackbar.Add($"Successfully removed subject.", Severity.Success);
+        }
+    }
+}

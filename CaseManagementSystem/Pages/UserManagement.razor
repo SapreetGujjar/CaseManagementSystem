@@ -1,0 +1,944 @@
+﻿@page "/usermanagement"
+
+@using System.Net.Http.Json
+@using CaseManagementSystem.Data.Auth;
+@using CaseManagementSystem.Data.Users
+@using System.Net.Mail;
+@using System.Net;
+@using System.Data;
+@using System.Text;
+
+@inject IDialogService Dialog
+@inject UsersService UsersService
+@inject ISnackbar Snackbar
+@inject CustomAuthenticationStateProvider CustomAuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS;
+@inject ILogger<UserManagement> Logger
+
+
+<style>
+    .selected {
+        background-color: #1E88E5 !important;
+    }
+
+    .company-list-th {
+        color: #5c6479 !important;
+        font-size: 13px;
+    }
+
+    tbody td {
+        width: 25%;
+        font-size: 14px;
+        color: #5c6479 !important;
+    }
+
+    .name-colm {
+        font-size: 14px;
+        color: #000 !important;
+        font-weight: 400;
+    }
+
+    .selected > td .mud-input {
+        color: white !important;
+    }
+
+    .mud-tabs-toolbar {
+        width: 43%;
+    }
+
+    .mud-tabs-toolbar-content {
+        width: fit-content !important;
+        flex: 0 1 auto !important;
+    }
+
+    .mud-tabs-toolbar .mud-tabs-toolbar-inner {
+        justify-content: center;
+    }
+
+    .mud-table {
+        box-shadow: 0 0.5rem 1.5rem 0.5rem #eaeaea96;
+        border: 1px solid #5c64792b
+    }
+
+    .form-control .mud-input-control {
+        display: block;
+        width: 100%;
+        padding: 0.3rem 1rem;
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #5c6479;
+        appearance: none;
+        background-color: #5c64791f;
+        background-clip: padding-box;
+        border: 1px solid #5c647936;
+        border-radius: 0.475rem;
+        box-shadow: false;
+        transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    }
+
+    /* .mud-input.mud-input-underline:before {
+                border-bottom: 0px
+            } */
+
+    .mud-input-control > .mud-input-control-input-container > div.mud-input.mud-input-text {
+        margin-top: 0px;
+    }
+
+    .mud-tabs.mud-tabs-rounded {
+        position: relative;
+    }
+
+        .mud-tabs.mud-tabs-rounded .mud-tabs-toolbar {
+            position: absolute;
+            top: 8px;
+            z-index: 99;
+            left: 51%;
+            transform: translateX(-50%);
+        }
+
+    .mud-tab {
+        min-width: 144px !important;
+        max-width: 120px !important
+    }
+
+
+
+    .export-btn {
+        position: absolute;
+        top: 18px;
+        right: 2%;
+        z-index: 999;
+    }
+
+    .mud-table-root {
+        padding-top: 8px;
+    }
+
+    /*     .name-colm {
+                color: #000;
+                font-size: 14px;
+            } */
+
+
+    .mud-button-filled.mud-button-filled-primary {
+        background-color: #774991 !important;
+    }
+
+    /*  .mud-button-filled.mud-button-filled-primary:hover, .mud-button-filled.mud-button-filled-primary:focus-visible {
+                    background-color: #995FBA !important;
+                }
+         */
+    .mud-primary-text {
+        color: #774991 !important;
+    }
+
+    .mud-tab.mud-tab-active {
+        color: #774991;
+    }
+
+    .mud-tab-slider {
+        background: #774991 !important;
+    }
+
+
+
+
+    .form-control .mud-input-control {
+        display: block;
+        width: 100%;
+        padding: 0.3rem 1rem;
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #5c6479;
+        appearance: none;
+        background-color: #5c64791f;
+        background-clip: padding-box;
+        border: 1px solid #5c647936;
+        border-radius: 0.475rem;
+        box-shadow: false;
+        transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    }
+    /*
+            .mud-input-control > .mud-input-control-input-container > div.mud-input.mud-input-text {
+                margin-top: 0px;
+            } */
+
+    .mud-input.mud-input-underline:before {
+        border-bottom: 0px
+    }
+
+    .mud-table-cell {
+        font-size: 12px;
+    }
+
+    /*  .mud-table-root {
+                padding-top: 8px;
+            } */
+
+
+    /* .mud-button-filled.mud-button-filled-primary {
+                background-color: #774991 !important;
+            } */
+
+    .mud-button-filled.mud-button-filled-primary:hover, .mud-button-filled.mud-button-filled-primary:focus-visible {
+        background-color: #995FBA !important;
+    }
+
+    /*   .mud-primary-text {
+                color: #774991 !important;
+            } */
+</style>
+
+<PageTitle>User Management</PageTitle>
+
+
+<div class="mb-2">
+    <MudText Typo="Typo.h5"><b>User Management</b></MudText>
+</div>
+<MudTabs Elevation="4" class="tab-btn" AlwaysShowScrollButtons="true" Rounded="true" PrevIcon="@Icons.Material.Filled.SkipPrevious" NextIcon="@Icons.Material.Filled.SkipNext" ApplyEffectsToContainer="true" PanelClass="">
+    <MudTabPanel Text="All">
+        <MudTable Items="@_users" Hover="true" AllowUnsorted="false" Filter=" new Func<UsersViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+            <ToolBarContent>
+                <div class="d-flex justify-space-between align-items-center flex-grow-1">
+                    <div class="form-control">
+                        <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                    </div>
+                </div>
+                <div class="d-flex align-content-center justify-end mb-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportUsersDataCsv(0))">Export to CSV</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OpenManageUserDialog(null, null, null))">Create</MudButton>
+                </div>
+            </ToolBarContent>
+            <HeaderContent>
+
+                <!--        <MudTh>Username</MudTh>-->
+                @*   <MudTh>Firstname</MudTh>
+                <MudTh>Lastname</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>User Email</MudTh>
+                <MudTh>Company</MudTh>
+                <MudTh>Last Login</MudTh>
+                <MudTh>Is Active</MudTh> *@
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.FirstName)">Firstname</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.LastName)">Lastname</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.RoleType)">Role</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.EmailAddress)">User Email</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.CompanyName)">Company</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.LastLogin)">Last Login</MudTableSortLabel></MudTd>
+                <MudTd Style="width:120px"><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.IsActive)">Is Active</MudTableSortLabel></MudTd>
+                <MudTd>Actions</MudTd>
+
+            </HeaderContent>
+            <RowTemplate>
+
+                <!--<MudTd DataLabel="Username">@context.UserName</MudTd>-->
+                <MudTd DataLabel="Firstname">@context.FirstName</MudTd>
+                <MudTd DataLabel="Lastname">@context.LastName</MudTd>
+                <MudTd DataLabel="Role">@context.GetRoleTypeName()</MudTd>
+                <MudTd DataLabel="User Email">@context.EmailAddress</MudTd>
+                <MudTd DataLabel="Company">
+                    @if ((CaseManagementSystem.Data.Enum.RoleType)(context.RoleType ?? 0) == CaseManagementSystem.Data.Enum.RoleType.Agent)
+                        @context.AgentCompanyName
+                    else
+                        @context.CompanyName
+
+                </MudTd>
+                <MudTd DataLabel="Last Login">@context.LastLogin?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                <MudTd DataLabel="Is Active">
+                    @if (_currentLoginUser.RoleType == 1)
+                    {
+                        <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                    }
+                    else
+                    {
+                        <MudSwitch T="bool" Checked="@context.IsActive" Disabled="true" Color="Color.Primary"></MudSwitch>
+                    }
+                </MudTd>
+
+                @*  <MudTd DataLabel="Is Active">
+                <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                </MudTd> *@
+                <MudTd Class="d-flex">
+                    <div>
+                        <MudTd DataLabel="Edit" Style="padding: 0;border-bottom:0;">
+                            <MudTooltip Text="Edit User" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" Disabled="@IsEditDisabled(@context)" OnClick="@((e) => OpenManageUserDialog(@context.Id, null, 1))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+                    </div>
+
+                    <div>
+                        <MudTd DataLabel="Change Password" Style="padding: 0;border-bottom:0;">
+                            <MudTooltip Text="Change Password" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.Password" Color="Color.Primary" aria-label="Password" Disabled="@IsPasswordDisabled(@context)" OnClick="@(() => OpenChangePasswordDialog(@context.Id))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+                    </div>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudTabPanel>
+    <MudTabPanel Text="Internal Admin">
+        <MudTable Items="@_users.Where(c => c.RoleType == 1)" Hover="true" AllowUnsorted="false" Filter=" new Func<UsersViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+            <ToolBarContent>
+                <div class="d-flex justify-space-between align-items-center flex-grow-1">
+                    <div class="form-control">
+                        <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                    </div>
+                </div>
+                <div class="d-flex align-content-center justify-end mb-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportUsersDataCsv(1))">Export to CSV</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OpenManageUserDialog(null, null, 1))">Create</MudButton>
+                </div>
+            </ToolBarContent>
+            <HeaderContent>
+
+                <!--        <MudTh>Username</MudTh>-->
+                @*   <MudTh>Firstname</MudTh>
+                <MudTh>Lastname</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>User Email</MudTh>
+                <MudTh>Company</MudTh>
+                <MudTh>Last Login</MudTh>
+                <MudTh>Is Active</MudTh> *@
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.FirstName)">Firstname</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.LastName)">Lastname</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.RoleType)">Role</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.EmailAddress)">User Email</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.CompanyName)">Company</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.LastLogin)">Last Login</MudTableSortLabel></MudTd>
+                <MudTd Style="width:120px"><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.IsActive)">Is Active</MudTableSortLabel></MudTd>
+                <MudTd>Actions</MudTd>
+
+            </HeaderContent>
+            <RowTemplate>
+
+                <!--<MudTd DataLabel="Username">@context.UserName</MudTd>-->
+                <MudTd DataLabel="Firstname">@context.FirstName</MudTd>
+                <MudTd DataLabel="Lastname">@context.LastName</MudTd>
+                <MudTd DataLabel="Role">@context.GetRoleTypeName()</MudTd>
+                <MudTd DataLabel="User Email">@context.EmailAddress</MudTd>
+                <MudTd DataLabel="Company">
+                    @if ((CaseManagementSystem.Data.Enum.RoleType)(context.RoleType ?? 0) == CaseManagementSystem.Data.Enum.RoleType.Agent)
+                        @context.AgentCompanyName
+                    else
+                        @context.CompanyName
+
+                </MudTd>
+                <MudTd DataLabel="Last Login">@context.LastLogin?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                <MudTd DataLabel="Is Active">
+                    @if (_currentLoginUser.RoleType == 1)
+                    {
+                        <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                    }
+                    else
+                    {
+                        <MudSwitch T="bool" Checked="@context.IsActive" Disabled="true" Color="Color.Primary"></MudSwitch>
+                    }
+                </MudTd>
+                @*                 <MudTd DataLabel="Is Active">
+                <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                </MudTd> *@
+                <MudTd Class="d-flex">
+                    <div>
+                        <MudTd DataLabel="Edit" Style="padding: 0;border-bottom:0;">
+                            <MudTooltip Text="Edit User" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" Disabled="@IsEditDisabled(@context)" OnClick="@((e) => OpenManageUserDialog(@context.Id, null, 1))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+                    </div>
+
+                    <div>
+                        <MudTd DataLabel="Change Password" Style="padding: 0;border-bottom:0;">
+                            <MudTooltip Text="Change Password" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.Password" Color="Color.Primary" Disabled="@IsPasswordDisabled(@context)" aria-label="Password" OnClick="@(() => OpenChangePasswordDialog(@context.Id))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+                    </div>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudTabPanel>
+    <MudTabPanel Text="Client">
+        <MudTable Items="@_users.Where(c => c.RoleType == 2)" Hover="true" AllowUnsorted="false" Filter=" new Func<UsersViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+            <ToolBarContent>
+                <div class="d-flex justify-space-between align-items-center flex-grow-1">
+                    <div class="form-control">
+                        <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                    </div>
+                </div>
+                <div class="d-flex align-content-center justify-end mb-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportUsersDataCsv(2))">Export to CSV</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OpenManageUserDialog(null, null, 2))">Create</MudButton>
+                </div>
+            </ToolBarContent>
+            <HeaderContent>
+
+                <!--        <MudTh>Username</MudTh>-->
+                @*   <MudTh>Firstname</MudTh>
+                <MudTh>Lastname</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>User Email</MudTh>
+                <MudTh>Company</MudTh>
+                <MudTh>Last Login</MudTh>
+                <MudTh>Is Active</MudTh> *@
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.FirstName)">Firstname</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.LastName)">Lastname</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.RoleType)">Role</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.EmailAddress)">User Email</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.CompanyName)">Company</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.LastLogin)">Last Login</MudTableSortLabel></MudTd>
+                <MudTd Style="width:120px"><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.IsActive)">Is Active</MudTableSortLabel></MudTd>
+                <MudTd>Actions</MudTd>
+
+            </HeaderContent>
+            <RowTemplate>
+
+                <!--<MudTd DataLabel="Username">@context.UserName</MudTd>-->
+                <MudTd DataLabel="Firstname">@context.FirstName</MudTd>
+                <MudTd DataLabel="Lastname">@context.LastName</MudTd>
+                <MudTd DataLabel="Role">@context.GetRoleTypeName()</MudTd>
+                <MudTd DataLabel="User Email">@context.EmailAddress</MudTd>
+                <MudTd DataLabel="Company">
+                    @if ((CaseManagementSystem.Data.Enum.RoleType)(context.RoleType ?? 0) == CaseManagementSystem.Data.Enum.RoleType.Agent)
+                        @context.AgentCompanyName
+                    else
+                        @context.CompanyName
+
+                </MudTd>
+                <MudTd DataLabel="Last Login">@context.LastLogin?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                <MudTd DataLabel="Is Active">
+                    @if (_currentLoginUser.RoleType == 1)
+                    {
+                        <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                    }
+                    else
+                    {
+                        <MudSwitch T="bool" Checked="@context.IsActive" Disabled="true" Color="Color.Primary"></MudSwitch>
+                    }
+                </MudTd>
+                @*  <MudTd DataLabel="Is Active">
+                <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                </MudTd> *@
+                <MudTd Class="d-flex">
+                    <div>
+                        <MudTd DataLabel="Edit" Style="padding: 0;border-bottom:0;">
+                            <MudTooltip Text="Edit User" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" OnClick="@((e) => OpenManageUserDialog(@context.Id, null, 2))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+                    </div>
+
+                    <div>
+                        <MudTd DataLabel="Change Password" Style="padding: 0;border-bottom:0;">
+                            <MudTooltip Text="Change Password" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.Password" Color="Color.Primary" aria-label="Password" Disabled="@IsPasswordDisabled(@context)" OnClick="@(() => OpenChangePasswordDialog(@context.Id))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+
+                    </div>
+
+
+                </MudTd>
+
+
+
+
+
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudTabPanel>
+    <MudTabPanel Text="Agent">
+        <MudTable Items="@_users.Where(c => c.RoleType == 3)" Hover="true" AllowUnsorted="false" Filter=" new Func<UsersViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+            <ToolBarContent>
+                <div class="d-flex justify-space-between align-items-center flex-grow-1">
+                    <div class="form-control">
+                        <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                    </div>
+                </div>
+                <div class="d-flex align-content-center justify-end mb-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportUsersDataCsv(3))">Export to CSV</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OpenManageUserDialog(null, null, 3))">Create</MudButton>
+                </div>
+            </ToolBarContent>
+            <HeaderContent>
+
+                <!--        <MudTh>Username</MudTh>-->
+                @*   <MudTh>Firstname</MudTh>
+                <MudTh>Lastname</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>User Email</MudTh>
+                <MudTh>Company</MudTh>
+                <MudTh>Last Login</MudTh>
+                <MudTh>Is Active</MudTh> *@
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.FirstName)">Firstname</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.LastName)">Lastname</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.RoleType)">Role</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.EmailAddress)">User Email</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.CompanyName)">Company</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.LastLogin)">Last Login</MudTableSortLabel></MudTd>
+                <MudTd Style="width:120px"><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.IsActive)">Is Active</MudTableSortLabel></MudTd>
+                <MudTd>Actions</MudTd>
+
+            </HeaderContent>
+            <RowTemplate>
+
+                <!--<MudTd DataLabel="Username">@context.UserName</MudTd>-->
+                <MudTd DataLabel="Firstname">@context.FirstName</MudTd>
+                <MudTd DataLabel="Lastname">@context.LastName</MudTd>
+                <MudTd DataLabel="Role">@context.GetRoleTypeName()</MudTd>
+                <MudTd DataLabel="User Email">@context.EmailAddress</MudTd>
+                <MudTd DataLabel="Company">
+                    @if ((CaseManagementSystem.Data.Enum.RoleType)(context.RoleType ?? 0) == CaseManagementSystem.Data.Enum.RoleType.Agent)
+                        @context.AgentCompanyName
+                    else
+                        @context.CompanyName
+
+
+
+
+
+
+
+
+
+                </MudTd>
+                <MudTd DataLabel="Last Login">@context.LastLogin?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                <MudTd DataLabel="Is Active">
+                    @if (_currentLoginUser.RoleType == 1)
+                    {
+                        <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                    }
+                    else
+                    {
+                        <MudSwitch T="bool" Checked="@context.IsActive" Disabled="true" Color="Color.Primary"></MudSwitch>
+                    }
+                </MudTd>
+                @*   <MudTd DataLabel="Is Active">
+                <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                </MudTd> *@
+                <MudTd Class="d-flex">
+                    <div>
+                        <MudTd DataLabel="Edit" Style="padding: 0;border-bottom:0;">
+                            <MudTooltip Text="Edit User" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" Disabled="@IsEditDisabled(@context)" OnClick="@((e) => OpenManageUserDialog(@context.Id, null, 3))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+                    </div>
+
+                    <div>
+                        <MudTd DataLabel="Change Password" Style="padding: 0;border-bottom:0;">
+                            <MudTooltip Text="Change Password" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.Password" Color="Color.Primary" aria-label="Password" Disabled="@IsPasswordDisabled(@context)" OnClick="@(() => OpenChangePasswordDialog(@context.Id))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+
+                    </div>
+
+
+                </MudTd>
+
+
+
+
+
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudTabPanel>
+    <MudTabPanel Text="Internal">
+        <MudTable Items="@_users.Where(c => c.RoleType == 4)" Hover="true" AllowUnsorted="false" Filter=" new Func<UsersViewModel,bool>(FilterFuncCallBack)" @bind-SelectedItem="_selectedItem">
+            <ToolBarContent>
+                <div class="d-flex justify-space-between align-items-center flex-grow-1">
+                    <div class="form-control">
+                        <MudTextField @bind-Value="_searchString" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                    </div>
+                </div>
+                <div class="d-flex align-content-center justify-end mb-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mr-4" OnClick="@((e) => ExportUsersDataCsv(4))">Export to CSV</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@((e) => OpenManageUserDialog(null, null, 4))">Create</MudButton>
+                </div>
+            </ToolBarContent>
+            <HeaderContent>
+
+                <!--        <MudTh>Username</MudTh>-->
+                @*   <MudTh>Firstname</MudTh>
+                <MudTh>Lastname</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>User Email</MudTh>
+                <MudTh>Company</MudTh>
+                <MudTh>Last Login</MudTh>
+                <MudTh>Is Active</MudTh> *@
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.FirstName)">Firstname</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<UsersViewModel, object>(x=>x.LastName)">Lastname</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.RoleType)">Role</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.EmailAddress)">User Email</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.CompanyName)">Company</MudTableSortLabel></MudTd>
+                <MudTd><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.LastLogin)">Last Login</MudTableSortLabel></MudTd>
+                <MudTd Style="width:120px"><MudTableSortLabel SortBy="new Func<UsersViewModel, object>(x=>x.IsActive)">Is Active</MudTableSortLabel></MudTd>
+                <MudTd>Actions</MudTd>
+
+            </HeaderContent>
+            <RowTemplate>
+
+                <!--<MudTd DataLabel="Username">@context.UserName</MudTd>-->
+                <MudTd DataLabel="Firstname">@context.FirstName</MudTd>
+                <MudTd DataLabel="Lastname">@context.LastName</MudTd>
+                <MudTd DataLabel="Role">@context.GetRoleTypeName()</MudTd>
+                <MudTd DataLabel="User Email">@context.EmailAddress</MudTd>
+                <MudTd DataLabel="Company">
+                    @if ((CaseManagementSystem.Data.Enum.RoleType)(context.RoleType ?? 0) == CaseManagementSystem.Data.Enum.RoleType.Agent)
+                        @context.AgentCompanyName
+                    else
+                        @context.CompanyName
+
+
+
+
+
+
+
+
+
+
+                </MudTd>
+                <MudTd DataLabel="Last Login">@context.LastLogin?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+                <MudTd DataLabel="Is Active">
+                    @if (_currentLoginUser.RoleType == 1)
+                    {
+                        <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                    }
+                    else
+                    {
+                        <MudSwitch T="bool" Checked="@context.IsActive" Disabled="true" Color="Color.Primary"></MudSwitch>
+                    }
+                </MudTd>
+                @*   <MudTd DataLabel="Is Active">
+                <MudSwitch T="bool" Checked="@context.IsActive" CheckedChanged="@(e => ActiveUser(context, e))" Color="Color.Primary"></MudSwitch>
+                </MudTd> *@
+                <MudTd Class="d-flex">
+                    <div>
+                        <MudTd DataLabel="Edit" Style="padding: 0;border-bottom:0;">
+                            <MudTooltip Text="Edit User" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" aria-label="Edit" Disabled="@IsEditDisabled(@context)" OnClick="@((e) => OpenManageUserDialog(@context.Id, null, 4))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+                    </div>
+
+                    <div>
+                        <MudTd DataLabel="Change Password" Style="padding: 0;border-bottom:0;">
+                            <MudTooltip Text="Change Password" Color="Color.Primary" Placement="Placement.Top">
+                                <MudIconButton Icon="@Icons.Material.Filled.Password" Color="Color.Primary" aria-label="Password" Disabled="@IsPasswordDisabled(@context)" OnClick="@(() => OpenChangePasswordDialog(@context.Id))"></MudIconButton>
+                            </MudTooltip>
+                        </MudTd>
+
+                    </div>
+
+
+                </MudTd>
+
+
+
+
+
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private UsersViewModel _selectedItem = null;
+    private IEnumerable<UsersViewModel> _users = new List<UsersViewModel>();
+    private string _searchString = "";
+    private UsersViewModel _currentLoginUser = new UsersViewModel();
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CustomAuthenticationStateProvider.IsAuthenticated())
+        {
+            NavigationManager.NavigateTo("/");
+        }
+
+        if (CustomAuthenticationStateProvider.RoleType() == "Agent")
+        {
+            NavigationManager.NavigateTo("/index");
+        }
+
+        _currentLoginUser = await UsersService.CheckLogin(CustomAuthenticationStateProvider.UserName());
+        await GetUsers();
+    }
+
+    private async Task GetUsers()
+    {
+        if (CustomAuthenticationStateProvider.RoleType() != "InternalAdmin")
+        {
+            _users = (await UsersService.GetAllUsersByClientAsync(_currentLoginUser.Id)).ToList();
+        }
+        else
+        {
+            _users = (await UsersService.GetAllUsersAsync()).ToList();
+        }
+        if (CustomAuthenticationStateProvider.RoleType() == "Internal")
+        {
+            _users = (await UsersService.GetAllUsersAsync()).ToList();
+        }
+    }
+    private bool IsEditDisabled(UsersViewModel context)
+    {
+        if (_currentLoginUser.RoleType != 1)
+        {
+            return context.RoleType == 1;
+        }
+        else
+        {
+            return false;
+        }
+    }
+    private bool IsPasswordDisabled(UsersViewModel context)
+    {
+        if (_currentLoginUser.RoleType == 4)
+        {
+            if (context.Id == _currentLoginUser.Id)
+            {
+                return false;
+            }
+        }
+        if (_currentLoginUser.RoleType == 1)
+        {
+            return false;
+        }
+        return true;
+    }
+
+
+    private bool FilterFuncCallBack(UsersViewModel user) => FilterFunc(user, _searchString);
+
+    private bool FilterFunc(UsersViewModel user, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        //        if ((user?.UserName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+        //            return true;
+        if ((user?.FirstName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((user?.LastName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((user?.GetRoleTypeName()?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((user?.EmailAddress?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((user?.CompanyName?.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+        if ((user?.LastLogin?.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase)) ?? false)
+            return true;
+
+        return false;
+    }
+
+    private async Task OpenManageUserDialog(Guid? Id, byte? RoleType, byte? SelectRoleType)
+    {
+        var parameters = new DialogParameters<ManageUser>();
+        parameters.Add(x => x.Id, Id);
+        parameters.Add(x => x.RoleTypeValue, RoleType);
+        parameters.Add(x => x.SelectRoleType, SelectRoleType);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ManageUser>("User", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetUsers();
+        }
+    }
+
+    private async Task OpenChangePasswordDialog(Guid Id)
+    {
+        var parameters = new DialogParameters<ManageUser>();
+        parameters.Add(x => x.Id, Id);
+
+        DialogOptions options = new DialogOptions() { MaxWidth = MaxWidth.Medium, CloseButton = true };
+
+        DialogResult result = await Dialog.Show<ChangePassword>("Change Password", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await GetUsers();
+        }
+    }
+
+    private async Task ActiveUser(UsersViewModel record, bool isChecked)
+    {
+        var parameters = new DialogParameters<ConfirmationDialogContent>();
+        parameters.Add(x => x.ContentText, $"Do you really want to {(isChecked ? "active" : "in-active")} this record?");
+        parameters.Add(x => x.ButtonText, "Yes");
+        parameters.Add(x => x.Color, Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        DialogResult result = await Dialog.Show<ConfirmationDialogContent>("Confirmation", parameters, options).Result;
+
+        if (!result.Canceled)
+        {
+            await UsersService.ActiveUsersAsync(record.Id, isChecked, _currentLoginUser.Id);
+            await GetUsers();
+
+            Snackbar.Add($"Successfully {(isChecked ? "active" : "in-active")} user.", Severity.Success);
+        }
+    }
+
+    private void check()
+    {
+        string senderEmail = "prajaktaujdikar75@gmail.com";
+        string senderPassword = "Praju@5254";
+
+        // Recipient's email address
+        string recipientEmail = "krunalchaudharidev@gmail.com";
+
+        // Create a new MailMessage object
+        MailMessage message = new MailMessage();
+        message.From = new MailAddress(senderEmail);
+        message.To.Add(recipientEmail);
+        message.Subject = "Hello, World!";
+        message.Body = "This is a test email sent from C#.";
+
+        // Create a new SmtpClient to send the email
+        SmtpClient smtpClient = new SmtpClient("smtp.gmail.com");
+        smtpClient.Port = 587; // Port for Gmail's SMTP server
+        smtpClient.UseDefaultCredentials = false;
+        smtpClient.Credentials = new NetworkCredential(senderEmail, senderPassword);
+        smtpClient.EnableSsl = true;
+
+        try
+        {
+            // Send the email
+            smtpClient.Send(message);
+            Console.WriteLine("Email sent successfully!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error sending email: " + ex.Message);
+        }
+        finally
+        {
+            // Dispose of the SmtpClient and MailMessage objects
+            smtpClient.Dispose();
+            message.Dispose();
+        }
+    }
+
+    // private async Task ExportUsersDataCsv()
+    // {
+    //     _users = await UsersService.GetAllUsersAsync();
+    //     string csvFilePath = "elvis_Users.csv";
+    //     string FilePath = await ExportToCsv(csvFilePath, _users);
+    //     await JS.InvokeVoidAsync("downloadFile", FilePath, "elvis_Users.csv");
+    // }
+
+    private async Task ExportUsersDataCsv(int status)
+        {
+        IEnumerable<UsersViewModel> UsersToExport;
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            UsersToExport = _users.Where(User => FilterFunc(User, _searchString));
+        }
+        else if(status==1)
+        {
+            var usersList = await UsersService.GetAllUsersAsync();
+            var list = usersList.ToList();
+            var filterUser = list.Where(user => user.RoleType == status);
+            UsersToExport = filterUser;
+        }
+         else if(status==2)
+        {
+            var usersList = await UsersService.GetAllUsersAsync();
+            var list = usersList.ToList();
+            var filterUser = list.Where(user => user.RoleType == status);
+            UsersToExport = filterUser;
+        }
+         else if(status==3)
+        {
+            var usersList = await UsersService.GetAllUsersAsync();
+            var list = usersList.ToList();
+            var filterUser = list.Where(user => user.RoleType == status);
+            UsersToExport = filterUser;
+        }
+         else if(status==4)
+        {
+            var usersList = await UsersService.GetAllUsersAsync();
+            var list = usersList.ToList();
+            var filterUser = list.Where(user => user.RoleType == status);
+            UsersToExport = filterUser;
+        }
+        else
+        {
+            var usersList = await UsersService.GetAllUsersAsync();
+            var list = usersList.ToList();
+            UsersToExport = list;
+        }
+        string csvFilePath = "elvis_Users.csv";
+        string FilePath = await ExportToCsv(csvFilePath, UsersToExport);
+        await JS.InvokeVoidAsync("downloadFile", FilePath, "elvis_Users.csv");
+    }
+
+    private async Task<string> ExportToCsv(string filePath, IEnumerable<UsersViewModel> UsersView)
+    {
+        DataTable dataTable = new DataTable();
+        dataTable.Columns.Add("First_Name", typeof(string));
+        dataTable.Columns.Add("Last_Name", typeof(string));
+        dataTable.Columns.Add("Role", typeof(string));
+        dataTable.Columns.Add("User_Email", typeof(string));
+        dataTable.Columns.Add("Company", typeof(string));
+        dataTable.Columns.Add("Last_Login", typeof(string));
+
+        foreach (var users in UsersView)
+        {
+            dataTable.Rows.Add(
+                users.FirstName,
+                users.LastName,
+                users.RoleType == 1 ? "InternalAdmin" : users.RoleType == 2 ? "Client" : "Agent",
+                users.EmailAddress,
+                users.CompanyName,
+                users.LastLogin
+            );
+        }
+        return DataTableToString(dataTable);
+    }
+
+    private string DataTableToString(DataTable dataTable)
+    {
+        StringBuilder sb = new StringBuilder();
+        foreach (DataColumn column in dataTable.Columns)
+        {
+            sb.Append(column.ColumnName);
+            sb.Append(",");
+        }
+        sb.AppendLine();
+        foreach (DataRow row in dataTable.Rows)
+        {
+            foreach (var item in row.ItemArray)
+            {
+                sb.Append(item);
+                sb.Append(",");
+            }
+            sb.AppendLine();
+        }
+        return sb.ToString();
+    }
+
+
+}
